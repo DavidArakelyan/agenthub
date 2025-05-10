@@ -3,6 +3,11 @@
 /.pnp
 .pnp.js
 /venv/
+venv/
+venv/**/*.dylib
+venv/**/*.so
+venv/**/*.dll
+venv/**/*.pyd
 
 # Testing
 /coverage
