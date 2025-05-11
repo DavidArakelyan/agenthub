@@ -35,4 +35,9 @@ yarn-error.log*
 *.swo
 
 # TypeScript
-*.tsbuildinfo 
+*.tsbuildinfo
+
+# Cache
+*.cache
+.cache/
+__pycache__/ 
