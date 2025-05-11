@@ -13,25 +13,61 @@ The workflow maintains state through the `AgentState` class, which includes:
 - `current_step`: Current execution step
 - `task_status`: Task execution status and flags
 - `context`: Additional context for the current task
+- `query_type`: Type of query ("simple" or "complex")
+- `generation_type`: Type of generation needed ("code", "document", or "none")
+- `target_format`: Target format for generation (e.g., "py", "cpp", "java", "txt", "doc", "pdf")
+
+### Query Classification
+
+The service first classifies queries into two categories:
+
+1. **Simple Queries**
+   - Within LLM's knowledge cutoff date
+   - No code or document generation required
+   - No additional context provided
+   - Can be answered directly by the LLM
+
+2. **Complex Queries**
+   - Require recent information (post LLM cutoff)
+   - Need code or document generation
+   - Include additional context (attachments)
+   - Require specialized processing
 
 ### Workflow Components
 
-1. **Task Planner**
+1. **Query Classifier**
    - Analyzes user requests
-   - Determines if web search or document processing is needed
-   - Returns a structured plan with boolean flags for required services
+   - Determines query type (simple/complex)
+   - Identifies required processing steps
+   - Returns structured classification with processing flags
 
 2. **Web Searcher** (Conditional)
-   - Activated only when web search is required
+   - Activated for queries needing recent information
    - Performs web searches based on task requirements
    - Adds search results to the context
 
 3. **Document Processor** (Conditional)
-   - Activated only when document processing is needed
+   - Activated when additional context is provided
    - Processes and embeds documents
    - Adds document context to the state
 
-4. **Response Generator**
+4. **Code Generator** (Conditional)
+   - Activated for code generation requests
+   - Uses specialized GPT-4 model
+   - Supports multiple languages:
+     - Python (.py)
+     - C++ (.cpp)
+     - Java (.java)
+
+5. **Document Generator** (Conditional)
+   - Activated for document generation requests
+   - Uses specialized GPT-4 model
+   - Supports multiple formats:
+     - Text (.txt)
+     - Word (.doc)
+     - PDF (.pdf)
+
+6. **Response Generator**
    - Generates final responses based on collected information
    - Uses context from all previous steps
    - Updates the conversation with the response
@@ -40,20 +76,27 @@ The workflow maintains state through the `AgentState` class, which includes:
 
 The workflow follows a dynamic routing pattern:
 
-1. **Entry Point**: Task Planner
+1. **Entry Point**: Query Classifier
    - Analyzes the user's request
-   - Determines required services through JSON response:
+   - Determines required processing through JSON response:
      ```json
      {
+       "query_type": "simple" | "complex",
        "needs_web_search": boolean,
-       "needs_document_processing": boolean
+       "needs_document_processing": boolean,
+       "generation_type": "code" | "document" | "none",
+       "target_format": "cpp" | "py" | "java" | "txt" | "doc" | "pdf" | "none"
      }
      ```
 
 2. **Conditional Routing**:
-   - If web search needed → Web Searcher → Response Generator
-   - If document processing needed → Document Processor → Response Generator
-   - If neither needed → directly to Response Generator
+   - Simple queries → directly to Response Generator
+   - Complex queries → appropriate processor(s):
+     - Recent info needed → Web Searcher
+     - Context provided → Document Processor
+     - Code needed → Code Generator
+     - Document needed → Document Generator
+   - All processors → Response Generator
 
 3. **Final Step**:
    - Response Generator creates the final response
