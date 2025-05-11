@@ -8,6 +8,7 @@ from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseMessage
 from langchain_core.messages import HumanMessage, SystemMessage
+import json
 
 from app.core.config import get_settings
 
@@ -29,8 +30,8 @@ def create_agent_workflow() -> Graph:
 
     The workflow implements the Model Context Protocol and handles:
     1. Task Planning
-    2. Web Search
-    3. Document Processing
+    2. Web Search (conditional)
+    3. Document Processing (conditional)
     4. LLM Interactions
     5. Response Generation
     """
@@ -38,7 +39,6 @@ def create_agent_workflow() -> Graph:
     workflow = StateGraph(AgentState)
 
     # Define the nodes (agents)
-
     def task_planner(state: AgentState) -> AgentState:
         """Plans the execution steps for a given task."""
         llm = ChatOpenAI(
@@ -50,7 +50,9 @@ def create_agent_workflow() -> Graph:
             [
                 (
                     "system",
-                    "You are a task planning agent that breaks down user requests into actionable steps.",
+                    "You are a task planning agent that breaks down user requests into actionable steps. "
+                    "Determine if the task requires web search or document processing. "
+                    "Return a JSON with 'needs_web_search' and 'needs_document_processing' boolean fields.",
                 ),
                 ("human", "{input}"),
             ]
@@ -60,12 +62,21 @@ def create_agent_workflow() -> Graph:
         # Get the task from state
         task = state["messages"][-1].content
 
-        # Generate plan
+        # Generate plan and parse the response
         plan = chain.invoke({"input": task})
+        try:
+            plan_data = json.loads(plan.content)
+            state["task_status"]["needs_web_search"] = plan_data.get(
+                "needs_web_search", False
+            )
+            state["task_status"]["needs_document_processing"] = plan_data.get(
+                "needs_document_processing", False
+            )
+        except json.JSONDecodeError:
+            # Default to no additional processing if parsing fails
+            state["task_status"]["needs_web_search"] = False
+            state["task_status"]["needs_document_processing"] = False
 
-        # Update state
-        state["task_status"]["plan"] = plan
-        state["current_step"] = "execute_step"
         return state
 
     def web_searcher(state: AgentState) -> AgentState:
@@ -115,9 +126,27 @@ def create_agent_workflow() -> Graph:
     workflow.add_node("document_processor", document_processor)
     workflow.add_node("response_generator", response_generator)
 
-    # Define edges (workflow transitions)
-    workflow.add_edge("task_planner", "web_searcher")
-    workflow.add_edge("web_searcher", "document_processor")
+    # Define conditional edges
+    def should_web_search(state: AgentState) -> bool:
+        return state["task_status"].get("needs_web_search", False)
+
+    def should_process_documents(state: AgentState) -> bool:
+        return state["task_status"].get("needs_document_processing", False)
+
+    # Add edges with conditions
+    workflow.add_conditional_edges(
+        "task_planner",
+        {
+            "web_searcher": should_web_search,
+            "document_processor": should_process_documents,
+            "response_generator": lambda state: not (
+                should_web_search(state) or should_process_documents(state)
+            ),
+        },
+    )
+
+    # Add edges from web searcher and document processor to response generator
+    workflow.add_edge("web_searcher", "response_generator")
     workflow.add_edge("document_processor", "response_generator")
 
     # Set entry point
