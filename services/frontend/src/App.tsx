@@ -1,11 +1,6 @@
 import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
+import { apiClient, ChatMessage, ApiClient } from './services/api';
 import './App.css';
-
-interface Message {
-    text: string;
-    type: 'user' | 'reply';
-    files?: File[];
-}
 
 interface AttachedFile {
     file: File;
@@ -15,20 +10,23 @@ interface AttachedFile {
 interface Chat {
     id: string;
     name: string;
-    messages: Message[];
+    messages: ChatMessage[];
     createdAt: Date;
     updatedAt: Date;
 }
 
+const apiClientInstance = new ApiClient();
+
 function App() {
     const [chats, setChats] = useState<Chat[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
     const [canvas, setCanvas] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +42,7 @@ function App() {
             setChats(parsedChats);
             if (parsedChats.length > 0) {
                 setCurrentChatId(parsedChats[0].id);
-                setMessages(parsedChats[0].messages);
+                loadChatHistory(parsedChats[0].id);
             }
         }
     }, []);
@@ -53,6 +51,16 @@ function App() {
     useEffect(() => {
         localStorage.setItem('chats', JSON.stringify(chats));
     }, [chats]);
+
+    const loadChatHistory = async (chatId: string) => {
+        try {
+            const history = await apiClient.getChatHistory(chatId);
+            setMessages(history);
+        } catch (error) {
+            console.error('Error loading chat history:', error);
+            setError('Failed to load chat history');
+        }
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,7 +71,6 @@ function App() {
     }, [messages]);
 
     const generateChatName = (firstMessage: string) => {
-        // Truncate the first message to create a chat name
         const maxLength = 30;
         const truncatedMessage = firstMessage.length > maxLength
             ? firstMessage.substring(0, maxLength) + '...'
@@ -71,37 +78,67 @@ function App() {
         return truncatedMessage;
     };
 
-    const createNewChat = () => {
-        const newChat: Chat = {
-            id: Math.random().toString(36).substr(2, 9),
-            name: 'New Chat',
-            messages: [],
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
-        setChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newChat.id);
-        setMessages([]);
-        setCanvas([]);
-        setAttachedFiles([]);
+    const createNewChat = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const chatId = await apiClient.createNewChat();
+            const newChat: Chat = {
+                id: chatId,
+                name: 'New Chat',
+                messages: [],
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            setChats(prev => [newChat, ...prev]);
+            setCurrentChatId(chatId);
+            setMessages([]);
+            setCanvas([]);
+            setAttachedFiles([]);
+        } catch (error) {
+            console.error('Error creating new chat:', error);
+            setError(error instanceof Error ? error.message : 'Failed to create new chat');
+
+            // If we have existing chats, don't show the error banner
+            // as the user can still use existing chats
+            if (chats.length === 0) {
+                // If no chats exist, show a retry button
+                setError(prev => prev + ' Click here to retry.');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const switchChat = (chatId: string) => {
-        const chat = chats.find(c => c.id === chatId);
-        if (chat) {
-            setCurrentChatId(chatId);
-            setMessages(chat.messages);
-            setCanvas([]); // Reset canvas when switching chats
-            setAttachedFiles([]);
+    const switchChat = async (chatId: string) => {
+        try {
+            const chat = chats.find(c => c.id === chatId);
+            if (chat) {
+                setCurrentChatId(chatId);
+                await loadChatHistory(chatId);
+                setCanvas([]); // Reset canvas when switching chats
+                setAttachedFiles([]);
+            }
+        } catch (error) {
+            console.error('Error switching chat:', error);
+            setError('Failed to switch chat');
         }
     };
 
     const handleSend = async () => {
-        if (input.trim() || attachedFiles.length > 0) {
-            const newMessage: Message = {
+        if ((!input.trim() && attachedFiles.length === 0) || !currentChatId) return;
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const newMessage: ChatMessage = {
+                id: Math.random().toString(36).substr(2, 9),
                 text: input,
                 type: 'user',
-                files: attachedFiles.map(f => f.file)
+                files: attachedFiles.map(f => f.file),
+                timestamp: new Date().toISOString()
             };
 
             // Update messages state
@@ -116,42 +153,52 @@ function App() {
                         ? { ...chat, name: chatName, messages: updatedMessages, updatedAt: new Date() }
                         : chat
                 ));
-            } else {
-                // Update existing chat
-                setChats(prev => prev.map(chat =>
-                    chat.id === currentChatId
-                        ? { ...chat, messages: updatedMessages, updatedAt: new Date() }
-                        : chat
-                ));
             }
 
-            setIsLoading(true);
+            // Send to backend
+            const response = await apiClient.sendMessage(
+                currentChatId,
+                input,
+                attachedFiles.map(f => f.file)
+            );
 
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Simulate a response
-            const response: Message = {
-                text: `Response to: ${input}${attachedFiles.length > 0 ? ' (with files)' : ''}`,
-                type: 'reply'
+            // Add response to messages
+            const responseMessage: ChatMessage = {
+                id: Math.random().toString(36).substr(2, 9),
+                text: response.message,
+                type: 'reply',
+                timestamp: new Date().toISOString()
             };
 
-            const finalMessages = [...updatedMessages, response];
+            const finalMessages = [...updatedMessages, responseMessage];
             setMessages(finalMessages);
+
+            // Update canvas if there's generated content
+            if (response.canvas_content) {
+                setCanvas([...canvas, response.canvas_content]);
+            }
+
+            // Update chat in state
             setChats(prev => prev.map(chat =>
                 chat.id === currentChatId
                     ? { ...chat, messages: finalMessages, updatedAt: new Date() }
                     : chat
             ));
 
-            // Only update canvas if there's generated content
-            const generatedContent = Math.random() > 0.5 ? `Generated content for: ${input}` : null;
-            if (generatedContent) {
-                setCanvas([...canvas, generatedContent]);
-            }
-
             setInput('');
             setAttachedFiles([]);
+        } catch (error) {
+            console.error('Error sending message:', error);
+            setError('Failed to send message');
+            // Add error message to chat
+            const errorMessage: ChatMessage = {
+                id: Math.random().toString(36).substr(2, 9),
+                text: 'Sorry, there was an error processing your message. Please try again.',
+                type: 'reply',
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
             setIsLoading(false);
         }
     };
@@ -200,12 +247,6 @@ function App() {
         }
     };
 
-    const clearChat = () => {
-        setMessages([]);
-        setCanvas([]);
-        setAttachedFiles([]);
-    };
-
     const formatFileSize = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -214,21 +255,54 @@ function App() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
-    const deleteChat = (chatId: string, event: React.MouseEvent) => {
+    const deleteChat = async (chatId: string, event: React.MouseEvent) => {
         event.stopPropagation();
-        setChats(prev => prev.filter(chat => chat.id !== chatId));
-        if (currentChatId === chatId) {
-            if (chats.length > 1) {
-                const remainingChats = chats.filter(chat => chat.id !== chatId);
-                switchChat(remainingChats[0].id);
-            } else {
-                createNewChat();
+        try {
+            await apiClient.deleteChat(chatId);
+            setChats(prev => prev.filter(chat => chat.id !== chatId));
+            if (currentChatId === chatId) {
+                if (chats.length > 1) {
+                    const remainingChats = chats.filter(chat => chat.id !== chatId);
+                    switchChat(remainingChats[0].id);
+                } else {
+                    createNewChat();
+                }
             }
+        } catch (error) {
+            console.error('Error deleting chat:', error);
+            setError('Failed to delete chat');
+        }
+    };
+
+    const handleFileUpload = async (file: File) => {
+        try {
+            const metadata = { source: 'user_upload' }; // Example metadata
+            const response = await apiClientInstance.uploadDocument(file, metadata);
+            console.log('Document uploaded successfully:', response);
+            // Handle success (e.g., show a success message)
+        } catch (error) {
+            console.error('Error uploading document:', error);
+            // Handle error (e.g., show an error message)
         }
     };
 
     return (
         <div className="App">
+            {error && (
+                <div className="error-banner" onClick={() => {
+                    if (chats.length === 0) {
+                        createNewChat();
+                    } else {
+                        setError(null);
+                    }
+                }}>
+                    {error}
+                    <button onClick={(e) => {
+                        e.stopPropagation();
+                        setError(null);
+                    }}>×</button>
+                </div>
+            )}
             <div className="chat-layout">
                 <div className="sidebar">
                     <button className="new-chat-button" onClick={createNewChat}>
