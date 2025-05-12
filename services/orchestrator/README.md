@@ -114,9 +114,29 @@ The workflow follows a dynamic routing pattern:
 ## Configuration
 
 The service uses environment variables for configuration:
+
+### OpenAI API Configuration
 - `OPENAI_API_KEY`: OpenAI API key
-- `MODEL_NAME`: LLM model name (default: "gpt-3.5-turbo")
-- `TEMPERATURE`: LLM temperature (default: 0.7)
+
+### Model Configurations
+1. **Main Decision Making Model** (o4-mini)
+   - Used for query classification, web search, and response generation
+   - Model: `o4-mini`
+   - Temperature: 0.7
+
+2. **Code Generation Model** (o3)
+   - Specialized for code generation tasks
+   - Model: `o3`
+   - Temperature: 0.2 (lower for more deterministic code)
+
+3. **Document Generation Model** (GPT-4.1)
+   - Specialized for document generation tasks
+   - Model: `gpt-4.1`
+   - Temperature: 0.7
+
+### Service Configuration
+- `ENVIRONMENT`: Service environment (default: "development")
+- `DEBUG`: Debug mode flag (default: false)
 
 ## Development
 

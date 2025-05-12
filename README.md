@@ -106,8 +106,9 @@ docker-compose -f deploy/docker/docker-compose.dev.yml up
 The services will be available at:
 - Frontend: http://localhost:3000
 - Orchestrator: http://localhost:8000
-- Web Search: http://localhost:8001
-- Grafana: http://localhost:3000
+- Document Service: http://localhost:8001
+- Web Search: http://localhost:8002
+- Grafana: http://localhost:3001
 - Prometheus: http://localhost:9090
 
 ## Project Structure
@@ -193,7 +194,50 @@ pytest
 
 This project is licensed under the MIT License - see the LICENSE file for details. 
 
-# services/frontend/.env
-REACT_APP_API_BASE_URL=http://localhost:8000
-REACT_APP_WS_URL=ws://localhost:8000/ws
-REACT_APP_MAX_FILE_SIZE=10485760  # 10MB 
+# Port Assignments
+
+The system uses the following port assignments:
+
+## Application Services
+- Frontend Service: 3000 (configured in Dockerfile and docker-compose.dev.yml)
+- Orchestrator Service: 8000 (configured in Dockerfile and docker-compose.dev.yml)
+- Document Service: 8001 (configured in app/core/config.py PORT setting and .env)
+- Web Search Service: 8002 (configured in app/main.py and Dockerfile)
+
+## Monitoring & Visualization
+- Grafana: 3001 (configured in docker-compose.dev.yml)
+- Prometheus: 9090 (configured in docker-compose.dev.yml)
+
+## Infrastructure Services
+- Redis: 6379 (standard Redis port, configured in docker-compose.dev.yml)
+- RabbitMQ:
+  - Main port: 5672 (standard AMQP port, configured in docker-compose.dev.yml)
+  - Management interface: 15672 (standard RabbitMQ management port, docker-compose.dev.yml)
+- Milvus:
+  - Main port: 19530 (standard Milvus port, configured in docker-compose.dev.yml)
+  - Web interface: 9091 (configured in docker-compose.dev.yml)
+
+## Port Assignment Best Practices
+
+The port assignments in this system follow these best practices:
+
+- Frontend and UI tools use 3000-range ports
+- Backend API services use 8000-range ports
+- Infrastructure services use their standard conventional ports
+- No port conflicts or overlaps between services
+- Clear separation between different service categories
+- Well-distributed across different port ranges
+
+This organization ensures:
+- Easy memorability of service locations
+- Consistent port numbering scheme
+- Standard ports for infrastructure services
+- Clear separation between service types
+- Room for adding new services without conflicts
+
+## Configuration Sources
+Most port configurations can be overridden through:
+1. Environment variables
+2. Service-specific .env files
+3. docker-compose.dev.yml for containerized services
+4. Application configuration files (config.py)
