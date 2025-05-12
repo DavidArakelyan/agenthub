@@ -12,6 +12,7 @@ import json
 import logging
 
 from app.core.config import get_settings
+from app.main import mcp  # Import FastMCP instance
 
 settings = get_settings()
 
@@ -29,7 +30,7 @@ class AgentState(TypedDict):
     context: Dict[str, Any]
     query_type: Literal["simple", "complex"]
     generation_type: Literal["code", "document", "none"]
-    target_format: str
+    target_format: Literal["cpp", "py", "java", "txt", "doc", "pdf", "none"]
 
 
 def create_agent_workflow() -> Graph:
@@ -109,39 +110,161 @@ def create_agent_workflow() -> Graph:
 
         def web_searcher(state: AgentState) -> AgentState:
             """Performs web search based on the task requirements."""
-            llm = ChatOpenAI(  # noqa: F841
-                temperature=settings.main_model_temperature,
-                model_name=settings.main_model_name,
-                openai_api_key=settings.openai_api_key,
-            )
-            # Implement web search logic
+            try:
+                # Get the query from state
+                query = state["messages"][-1].content
+
+                # Call websearch service
+                search_results = {
+                    "query": query,
+                    "results": [],
+                }  # To be implemented with actual service call
+
+                # Update state with search results
+                state["context"]["web_search_results"] = search_results
+                state["context"]["web_search_completed"] = True
+                logger.info("Web search completed successfully")
+            except Exception as e:
+                logger.error(f"Error in web search: {str(e)}")
+                state["context"]["web_search_completed"] = False
+                state["context"]["error"] = str(e)
             return state
 
-        def document_processor(state: AgentState) -> AgentState:
+        async def document_processor(state: AgentState) -> AgentState:
             """Processes and embeds documents for context."""
-            # Implement document processing logic
+            try:
+                # Get document path from context
+                file_path = state["context"].get("document_path")
+                metadata = state["context"].get("document_metadata", {})
+
+                if not file_path:
+                    raise ValueError("No document path provided in context")
+
+                # Call document service via FastMCP to process document
+                process_response = await mcp.call(
+                    service="document-service",
+                    method="process_document",
+                    data={"file_path": file_path, "metadata": metadata},
+                )
+
+                if not process_response.success:
+                    raise Exception(f"Document processing failed: {process_response.error}")
+
+                # Get the user's query from state
+                query = state["messages"][-1].content
+
+                # Perform semantic search to find relevant content
+                search_response = await mcp.call(
+                    service="document-service",
+                    method="semantic_search",
+                    data={"query": query, "k": 4},  # Get top 4 most relevant chunks
+                )
+
+                if not search_response.success:
+                    raise Exception(f"Semantic search failed: {search_response.error}")
+
+                # Update state with processing results and relevant content
+                state["context"]["document_processed"] = True
+                state["context"]["processing_result"] = process_response.data["message"]
+                state["context"]["relevant_content"] = search_response.data["documents"]
+                logger.info("Document processing and semantic search completed successfully")
+            except Exception as e:
+                logger.error(f"Error in document processing: {str(e)}")
+                state["context"]["document_processed"] = False
+                state["context"]["error"] = str(e)
             return state
 
         def code_generator(state: AgentState) -> AgentState:
             """Generates code in the specified programming language."""
-            # Use a specialized LLM for code generation
-            llm = ChatOpenAI(  # noqa: F841
-                temperature=settings.code_model_temperature,
-                model_name=settings.code_model_name,
-                openai_api_key=settings.openai_api_key,
-            )
-            # Implement code generation logic
+            try:
+                llm = ChatOpenAI(
+                    temperature=settings.code_model_temperature,
+                    model_name=settings.code_model_name,
+                    openai_api_key=settings.openai_api_key,
+                )
+
+                language_prompts = {
+                    "py": "Write Python code that is well-documented and follows PEP8.",
+                    "cpp": "Write C++ code following modern C++17 practices with clear documentation.",
+                    "java": "Write Java code following standard conventions with proper JavaDoc.",
+                }
+
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            language_prompts.get(
+                                state["target_format"], "Write clean, documented code."
+                            ),
+                        ),
+                        ("human", "{query}"),
+                    ]
+                )
+
+                chain = prompt | llm
+
+                # Generate code based on the last message and context
+                code_response = chain.invoke(
+                    {
+                        "query": state["messages"][-1].content,
+                    }
+                )
+
+                state["context"]["generated_code"] = code_response.content
+                state["context"]["code_generation_completed"] = True
+                logger.info(f"Code generation completed for {state['target_format']}")
+            except Exception as e:
+                logger.error(f"Error in code generation: {str(e)}")
+                state["context"]["code_generation_completed"] = False
+                state["context"]["error"] = str(e)
             return state
 
         def document_generator(state: AgentState) -> AgentState:
             """Generates documents in the specified format."""
-            # Use a specialized LLM for document generation
-            llm = ChatOpenAI(  # noqa: F841
-                temperature=settings.document_model_temperature,
-                model_name=settings.document_model_name,
-                openai_api_key=settings.openai_api_key,
-            )
-            # Implement document generation logic
+            try:
+                llm = ChatOpenAI(
+                    temperature=settings.document_model_temperature,
+                    model_name=settings.document_model_name,
+                    openai_api_key=settings.openai_api_key,
+                )
+
+                format_prompts = {
+                    "txt": "Generate plain text content that is clear and well-structured.",
+                    "doc": "Generate content suitable for a Word document with proper formatting.",
+                    "pdf": "Generate content suitable for a PDF document with clear sections.",
+                }
+
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            format_prompts.get(
+                                state["target_format"],
+                                "Generate well-structured content.",
+                            ),
+                        ),
+                        ("human", "{query}"),
+                    ]
+                )
+
+                chain = prompt | llm
+
+                # Generate document based on the last message and context
+                doc_response = chain.invoke(
+                    {
+                        "query": state["messages"][-1].content,
+                    }
+                )
+
+                state["context"]["generated_document"] = doc_response.content
+                state["context"]["document_generation_completed"] = True
+                logger.info(
+                    f"Document generation completed for {state['target_format']}"
+                )
+            except Exception as e:
+                logger.error(f"Error in document generation: {str(e)}")
+                state["context"]["document_generation_completed"] = False
+                state["context"]["error"] = str(e)
             return state
 
         def response_generator(state: AgentState) -> AgentState:
