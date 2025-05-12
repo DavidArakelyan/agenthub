@@ -40,4 +40,14 @@ yarn-error.log*
 # Cache
 *.cache
 .cache/
-__pycache__/ 
+__pycache__/
+
+# Node
+services/frontend/node_modules/ 
+services/frontend/node_modules/*
+
+# Python package metadata
+*.egg-info/
+*.egg
+dist/
+build/ 

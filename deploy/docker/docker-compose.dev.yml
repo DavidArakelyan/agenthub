@@ -3,13 +3,14 @@ version: '3.8'
 services:
   orchestrator:
     build:
-      context: ../../
-      dockerfile: services/orchestrator/Dockerfile
+      context: ../../services/orchestrator
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     env_file:
       - ../../.env
     environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ENVIRONMENT=development
     volumes:
       - ../../services/orchestrator:/app
@@ -45,54 +46,51 @@ services:
       - COMMON_CFG.retention_duration=100
 
   prometheus:
-    image: prom/prometheus:v2.45.0
+    image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
       - ../../deploy/prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
+      - prometheus-storage:/prometheus
 
   grafana:
-    image: grafana/grafana:10.0.3
+    image: grafana/grafana:latest
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
-      - ../../deploy/grafana:/etc/grafana/provisioning
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
+      - grafana-storage:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
 
   websearch:
     build:
-      context: ../../
-      dockerfile: services/websearch/Dockerfile
+      context: ../../services/websearch
+      dockerfile: Dockerfile.dev
     ports:
-      - "8001:8000"
-    env_file:
-      - ../../.env
-    environment:
-      - ENVIRONMENT=development
+      - "8002:8002"
     volumes:
       - ../../services/websearch:/app
-    depends_on:
-      - redis
-      - rabbitmq
 
   frontend:
     build:
-      context: ../../
-      dockerfile: services/frontend/Dockerfile
+      context: ../../services/frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     volumes:
       - ../../services/frontend:/app
       - /app/node_modules
     environment:
-      - NODE_ENV=development
+      - REACT_APP_API_BASE_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000/ws
+      - REACT_APP_DOCUMENT_SERVICE_URL=http://localhost:8001
+      - REACT_APP_WEBSEARCH_SERVICE_URL=http://localhost:8002
+      - REACT_APP_MAX_FILE_SIZE=10485760
 
 volumes:
   redis_data:
   rabbitmq_data:
   milvus_data:
-  prometheus_data:
-  grafana_data:
+  prometheus-storage:
+  grafana-storage:

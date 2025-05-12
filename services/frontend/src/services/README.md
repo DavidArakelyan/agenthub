@@ -6,38 +6,38 @@ This service handles all communication between the frontend and the backend orch
 
 ### 1. Message Flow
 ```
-Frontend (api.ts)                    Backend (main.py)
-+----------------+                   +----------------+
-|                |                   |                |
-| sendMessage()  |  POST /chat/message|                |
-|                |------------------>|                |
-|                |                   | create_agent_  |
-|                |                   | workflow()     |
-|                |                   |                |
-|                |                   | initialize_    |
-|                |                   | state()        |
-|                |                   |                |
-|                |                   | workflow.      |
-|                |                   | invoke()       |
-|                |                   |                |
-|                |  ChatResponse     |                |
-|                |<------------------|                |
-+----------------+                   +----------------+
+Frontend (api.ts)                     Backend (main.py)
++----------------+                    +-------------------------+
+|                |                    |                         |
+| sendMessage()  | POST /chat/message |                         |
+|                |------------------->|                         |
+|                |                    | create_agent_workflow() |
+|                |                    |                         |
+|                |                    |                         |
+|                |                    | initialize_state()      |
+|                |                    |                         |
+|                |                    |                         |
+|                |                    | workflow.invoke()       |
+|                |                    |                         |
+|                |                    |                         |
+|                |  ChatResponse      |                         | 
+|                |<-------------------|                         |
++----------------+                    +-------------------------+
 ```
 
 ### 2. File Upload Flow
 ```
-Frontend (api.ts)                    Backend (main.py)
-+----------------+                   +----------------+
-|                |                   |                |
-| uploadDocument |  POST /documents/ |                |
-| ()            |  upload           |                |
-|                |------------------>|                |
-|                |                   | Process file   |
-|                |                   |                |
-|                |  DocumentResponse |                |
-|                |<------------------|                |
-+----------------+                   +----------------+
+Frontend (api.ts)                            Backend (main.py)
++------------------+                         +----------------+
+|                  |                         |                |
+| uploadDocument() |  POST /documents/upload |                |
+|                  |------------------------>|                |
+|                  |                         |                |
+|                  |                         | Process file   |
+|                  |                         |                |
+|                  |  DocumentResponse       |                |
+|                  |<------------------------|                |
++------------------+                         +----------------+
 ```
 
 ## API Methods
