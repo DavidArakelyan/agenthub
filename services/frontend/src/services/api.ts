@@ -36,6 +36,30 @@ export interface DocumentResponse {
     metadata: Record<string, any>;
 }
 
+export interface ApiErrorResponse {
+    code: string;
+    message: string;
+    data?: any;
+}
+
+export interface ApiResponse<T> {
+    success: boolean;
+    data?: T;
+    error?: ApiErrorResponse;
+}
+
+export class ApiError extends Error {
+    code: string;
+    data?: any;
+
+    constructor(code: string, message: string, data?: any) {
+        super(message);
+        this.name = 'ApiError';
+        this.code = code;
+        this.data = data;
+    }
+}
+
 // API Client
 export class ApiClient {
     private client: AxiosInstance;
@@ -62,14 +86,36 @@ export class ApiClient {
 
         // Add response interceptor for error handling
         this.client.interceptors.response.use(
-            (response) => response,
+            (response) => {
+                const apiResponse = response.data as ApiResponse<any>;
+                if (!apiResponse.success) {
+                    throw new ApiError(
+                        apiResponse.error?.code || 'UNKNOWN_ERROR',
+                        apiResponse.error?.message || 'An unknown error occurred',
+                        apiResponse.error?.data
+                    );
+                }
+                return apiResponse.data;
+            },
             (error: AxiosError) => {
                 if (error.response?.status === 401) {
-                    // Handle unauthorized access
                     localStorage.removeItem('auth_token');
                     window.location.href = '/login';
                 }
-                return Promise.reject(error);
+
+                const apiError = error.response?.data as ApiResponse<any>;
+                if (apiError?.error) {
+                    throw new ApiError(
+                        apiError.error.code,
+                        apiError.error.message,
+                        apiError.error.data
+                    );
+                }
+
+                throw new ApiError(
+                    'NETWORK_ERROR',
+                    error.message || 'Network error occurred'
+                );
             }
         );
 
@@ -128,11 +174,10 @@ export class ApiClient {
             }
 
             const formData = new FormData();
+            formData.append('chat_id', chatId);
             formData.append('message', message);
-            formData.append('chatId', chatId);
-
-            files.forEach((file, index) => {
-                formData.append(`file${index}`, file);
+            files.forEach(file => {
+                formData.append('files', file);
             });
 
             const response = await this.client.post<ChatResponse>('/chat/message', formData, {
