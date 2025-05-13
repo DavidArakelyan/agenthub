@@ -1,5 +1,21 @@
 import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
 import { apiClient, ChatMessage, ApiClient } from './services/api';
+import Prism from 'prismjs';
+// Core prismjs styles
+import 'prismjs/themes/prism-tomorrow.css';
+// Core prism
+import 'prismjs/components/prism-core';
+// Basic languages
+import 'prismjs/components/prism-clike';
+// Individual languages
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-markup';
+import 'prismjs/components/prism-markdown';
 import './App.css';
 
 interface AttachedFile {
@@ -15,6 +31,12 @@ interface Chat {
     updatedAt: Date;
 }
 
+interface GeneratedContent {
+    type: string;
+    format: string;
+    content: string;
+}
+
 const apiClientInstance = new ApiClient();
 
 function App() {
@@ -23,10 +45,11 @@ function App() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
-    const [canvas, setCanvas] = useState<string[]>([]);
+    const [canvas, setCanvas] = useState<GeneratedContent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [serverSaveEnabled, setServerSaveEnabled] = useState<{ [key: number]: boolean }>({});
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -274,17 +297,59 @@ function App() {
         }
     };
 
-    const handleFileUpload = async (file: File) => {
+    useEffect(() => {
+        const newServerSaveState = { ...serverSaveEnabled };
+        canvas.forEach((_, index) => {
+            if (!(index in newServerSaveState)) {
+                newServerSaveState[index] = true; // Default to checked
+            }
+        });
+        setServerSaveEnabled(newServerSaveState);
+    }, [canvas, serverSaveEnabled]);
+
+    const handleSaveCanvas = async (content: GeneratedContent, index: number) => {
         try {
-            const metadata = { source: 'user_upload' }; // Example metadata
-            const response = await apiClientInstance.uploadDocument(file, metadata);
-            console.log('Document uploaded successfully:', response);
-            // Handle success (e.g., show a success message)
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const extension = content.format.toLowerCase();
+            const filename = `generated_${content.type}_${timestamp}.${extension}`;
+
+            // Create a blob and trigger browser download
+            const blob = new Blob([content.content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+
+            // Clean up download elements
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // Save to server if enabled and use the response
+            if (serverSaveEnabled[index]) {
+                const { message } = await apiClient.saveContentToServer(
+                    content.content,
+                    content.format,
+                    filename
+                );
+                setError(message);
+            } else {
+                setError(`Successfully downloaded ${filename}`);
+            }
+
+            setTimeout(() => setError(null), 3000);
         } catch (error) {
-            console.error('Error uploading document:', error);
-            // Handle error (e.g., show an error message)
+            console.error('Error saving content:', error);
+            setError('Failed to save content');
         }
     };
+
+    // Initialize Prism highlighting after content updates
+    useEffect(() => {
+        Prism.highlightAll();
+    }, [canvas]);
 
     return (
         <div className="App">
@@ -455,9 +520,37 @@ function App() {
                     )}
                 </div>
                 <div className="canvas-panel">
-                    <h2>Canvas</h2>
+                    <h2>Generated Content</h2>
                     {canvas.map((content, index) => (
-                        <div key={index} className="canvas-content">{content}</div>
+                        <div key={index} className="canvas-content">
+                            <div className="canvas-header">
+                                <span className="content-type">{content.type} - {content.format}</span>
+                                <div className="save-options">
+                                    <div className="save-checkbox">
+                                        <input
+                                            type="checkbox"
+                                            id={`server-save-${index}`}
+                                            checked={serverSaveEnabled[index]}
+                                            onChange={(e) => setServerSaveEnabled(prev => ({
+                                                ...prev,
+                                                [index]: e.target.checked
+                                            }))}
+                                        />
+                                        <label htmlFor={`server-save-${index}`}>Keep on server</label>
+                                    </div>
+                                    <button
+                                        className="save-button"
+                                        onClick={() => handleSaveCanvas(content, index)}
+                                        title="Save to file"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                            <pre className={`language-${content.format.toLowerCase()}`}>
+                                <code>{content.content}</code>
+                            </pre>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -465,4 +558,4 @@ function App() {
     );
 }
 
-export default App; 
+export default App;

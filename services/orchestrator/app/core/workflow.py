@@ -12,7 +12,7 @@ import json
 import logging
 
 from app.core.config import get_settings
-from app.main import mcp  # Import FastMCP instance
+from app.core.mcp_client import mcp
 
 settings = get_settings()
 
@@ -148,7 +148,9 @@ def create_agent_workflow() -> Graph:
                 )
 
                 if not process_response.success:
-                    raise Exception(f"Document processing failed: {process_response.error}")
+                    raise Exception(
+                        f"Document processing failed: {process_response.error}"
+                    )
 
                 # Get the user's query from state
                 query = state["messages"][-1].content
@@ -167,7 +169,9 @@ def create_agent_workflow() -> Graph:
                 state["context"]["document_processed"] = True
                 state["context"]["processing_result"] = process_response.data["message"]
                 state["context"]["relevant_content"] = search_response.data["documents"]
-                logger.info("Document processing and semantic search completed successfully")
+                logger.info(
+                    "Document processing and semantic search completed successfully"
+                )
             except Exception as e:
                 logger.error(f"Error in document processing: {str(e)}")
                 state["context"]["document_processed"] = False
@@ -274,18 +278,33 @@ def create_agent_workflow() -> Graph:
                 model_name=settings.main_model_name,
                 openai_api_key=settings.openai_api_key,
             )
+
+            # Prepare generated content for canvas if any
+            if state["context"].get("generated_code"):
+                state["context"]["canvas_content"] = {
+                    "type": "code",
+                    "format": state["target_format"],
+                    "content": state["context"]["generated_code"],
+                }
+            elif state["context"].get("generated_document"):
+                state["context"]["canvas_content"] = {
+                    "type": "document",
+                    "format": state["target_format"],
+                    "content": state["context"]["generated_document"],
+                }
+
+            # Generate response using context
             prompt = ChatPromptTemplate.from_messages(
                 [
                     (
                         "system",
-                        "You are a helpful assistant that generates responses based on collected information.",
+                        "You are a helpful assistant that generates responses based on collected information. "
+                        "If code or document was generated, reference it in your response.",
                     ),
                     ("human", "{context}"),
                 ]
             )
             chain = prompt | llm
-
-            # Generate response using context
             response = chain.invoke({"context": str(state["context"])})
 
             # Update state

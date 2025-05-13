@@ -2,28 +2,27 @@
 Main FastAPI application for the agent orchestrator service.
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query, Body, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query, Body, Request  # noqa: F401
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import uuid
 from datetime import datetime
-import os
 from pathlib import Path
 import json
-from fastmcp import FastMCP
 
 from app.core.workflow import create_agent_workflow, initialize_state
 from app.core.config import settings
 from app.core.exceptions import (
     AgentHubException,
-    ValidationError,
+    ValidationError,  # noqa: F401
     ChatNotFoundError,
-    WorkflowError,
+    WorkflowError,  # noqa: F401
     FileProcessingError,
 )
 from app.core.validators import MessageRequest, validate_file
+from app.core.mcp_client import init_mcp, mcp
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -68,16 +67,8 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Initialize FastMCP with document service configuration
-mcp = FastMCP(
-    app,
-    services={
-        "document-service": {
-            "url": settings.DOCUMENT_SERVICE_URL,
-            "timeout": settings.DOCUMENT_SERVICE_TIMEOUT,
-        }
-    },
-)
+# Initialize FastMCP
+init_mcp(app)
 
 # In-memory storage for chats and documents (replace with database in production)
 chats: Dict[str, Dict] = {}
@@ -123,23 +114,50 @@ class ChatMessageRequest(BaseModel):
 @app.post("/chat/new")
 async def create_new_chat():
     """Create a new chat session."""
-    chat_id = str(uuid.uuid4())
-    chats[chat_id] = {
-        "id": chat_id,
-        "name": "New Chat",
-        "messages": [],
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-    return {"chatId": chat_id}
+    try:
+        chat_id = str(uuid.uuid4())
+        chats[chat_id] = {
+            "id": chat_id,
+            "name": "New Chat",
+            "messages": [],
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        return {"success": True, "data": {"chatId": chat_id}}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Failed to create new chat",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.get("/chat/{chat_id}/history")
 async def get_chat_history(chat_id: str):
     """Get chat history."""
-    if chat_id not in chats:
-        raise HTTPException(status_code=404, detail="Chat not found")
-    return chats[chat_id]["messages"]
+    try:
+        if chat_id not in chats:
+            return {
+                "success": False,
+                "error": {
+                    "code": "CHAT_NOT_FOUND",
+                    "message": "Chat not found",
+                    "data": {"chat_id": chat_id},
+                },
+            }
+        return {"success": True, "data": chats[chat_id]["messages"]}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Failed to fetch chat history",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.post("/chat/message")
@@ -151,7 +169,7 @@ async def send_message(
     """Send a message to the chat."""
     try:
         # Validate request
-        request_data = MessageRequest(chat_id=chat_id, message=message)
+        request_data = MessageRequest(chat_id=chat_id, message=message)  # noqa: F841
 
         if chat_id not in chats:
             raise ChatNotFoundError(chat_id)
@@ -174,59 +192,98 @@ async def send_message(
             # Initialize workflow
             workflow = create_agent_workflow()
 
-            # Initialize state with message
+            # Initialize state with message and files
             state = initialize_state(message)
+            if file_paths:
+                state["context"]["document_path"] = file_paths[
+                    0
+                ]  # Use first file for now
 
             # Execute workflow
             final_state = workflow.invoke(state)
 
-            # Create response
-            response = ChatResponse(
-                message=final_state["messages"][-1].content,
-                task_status=final_state.get("task_status"),
-                canvas_content=final_state.get("canvas_content"),
-            )
+            # Extract canvas content if any was generated
+            canvas_content = final_state["context"].get("canvas_content")
+
+            # Get the last message (response from assistant)
+            response_message = final_state["messages"][-1].content
 
             # Update chat history
-            chats[chat_id]["messages"].append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "text": message,
-                    "type": "user",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "files": file_paths,
-                }
+            chat_message = ChatMessage(
+                id=str(uuid.uuid4()),
+                text=message,
+                type="user",
+                timestamp=datetime.utcnow().isoformat(),
+                files=[f.filename for f in files] if files else None,
             )
+            chats[chat_id]["messages"].append(chat_message)
 
-            chats[chat_id]["messages"].append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "text": response.message,
-                    "type": "reply",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
+            # Add response to chat history
+            response_chat_message = ChatMessage(
+                id=str(uuid.uuid4()),
+                text=response_message,
+                type="reply",
+                timestamp=datetime.utcnow().isoformat(),
             )
+            chats[chat_id]["messages"].append(response_chat_message)
 
+            # Update chat metadata
             chats[chat_id]["updated_at"] = datetime.utcnow().isoformat()
 
-            return {"success": True, "data": response}
+            return {
+                "success": True,
+                "data": {
+                    "message": response_message,
+                    "canvas_content": canvas_content,
+                    "task_status": final_state["task_status"],
+                },
+            }
 
         except Exception as e:
-            raise WorkflowError(f"Error processing message: {str(e)}")
+            return {
+                "success": False,
+                "error": {
+                    "code": "WORKFLOW_ERROR",
+                    "message": f"Error processing message: {str(e)}",
+                    "data": {"type": str(type(e).__name__)},
+                },
+            }
 
-    except AgentHubException:
-        raise
     except Exception as e:
-        raise WorkflowError(f"Unexpected error: {str(e)}")
+        return {
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": str(e),
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.delete("/chat/{chat_id}")
 async def delete_chat(chat_id: str):
     """Delete a chat."""
-    if chat_id not in chats:
-        raise HTTPException(status_code=404, detail="Chat not found")
-    del chats[chat_id]
-    return {"status": "success"}
+    try:
+        if chat_id not in chats:
+            return {
+                "success": False,
+                "error": {
+                    "code": "CHAT_NOT_FOUND",
+                    "message": "Chat not found",
+                    "data": {"chat_id": chat_id},
+                },
+            }
+        del chats[chat_id]
+        return {"success": True, "data": {"message": "Chat deleted successfully"}}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Failed to delete chat",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.post("/documents/upload")
@@ -350,3 +407,35 @@ async def web_search(query: str = Query(...)):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+class SaveContentRequest(BaseModel):
+    content: str
+    format: str
+    filename: str
+
+
+@app.post("/save")
+async def save_content(request: SaveContentRequest):
+    """Save generated content to a file on the server."""
+    try:
+        # Create uploads/generated directory if it doesn't exist
+        save_dir = UPLOAD_DIR / "generated"
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # Construct file path with timestamp to prevent overwrites
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        file_path = save_dir / f"{timestamp}_{request.filename}"
+
+        # Write content to file
+        with open(file_path, "w") as f:
+            f.write(request.content)
+
+        return {
+            "success": True,
+            "path": str(file_path),
+            "message": f"Content saved successfully to {request.filename}",
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving content: {str(e)}")

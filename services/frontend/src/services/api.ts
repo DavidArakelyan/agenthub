@@ -13,6 +13,12 @@ export interface ChatMessage {
     timestamp: string;
 }
 
+export interface GeneratedContent {
+    type: 'code' | 'document';
+    format: string;
+    content: string;
+}
+
 export interface Chat {
     id: string;
     name: string;
@@ -23,10 +29,10 @@ export interface Chat {
 
 export interface ChatResponse {
     message: string;
-    canvas_content?: string;
+    canvas_content?: GeneratedContent;
     task_status?: {
-        status: 'completed' | 'processing' | 'failed';
-        steps: string[];
+        needs_web_search: boolean;
+        needs_document_processing: boolean;
     };
 }
 
@@ -133,11 +139,11 @@ export class ApiClient {
     // Chat Operations
     async createNewChat(): Promise<string> {
         try {
-            const response = await this.client.post<{ chatId: string }>('/chat/new');
-            if (!response.data || !response.data.chatId) {
+            const response = await this.client.post<ApiResponse<{ chatId: string }>>('/chat/new');
+            if (!response.data?.success || !response.data.data?.chatId) {
                 throw new Error('Invalid response from server: missing chatId');
             }
-            return response.data.chatId;
+            return response.data.data.chatId;
         } catch (error) {
             if (error instanceof AxiosError) {
                 console.error('Error creating new chat:', {
@@ -254,7 +260,17 @@ export class ApiClient {
             throw new Error('Failed to perform web search');
         }
     }
+
+    // Save Content to Server
+    async saveContentToServer(content: string, format: string, filename: string): Promise<{ path: string, message: string }> {
+        const response = await this.client.post('/save', {
+            content,
+            format,
+            filename
+        });
+        return response.data;
+    }
 }
 
 // Export singleton instance
-export const apiClient = new ApiClient(); 
+export const apiClient = new ApiClient();

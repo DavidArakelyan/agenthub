@@ -3,9 +3,11 @@
     "version": "0.1.0",
     "private": true,
     "dependencies": {
+        "@types/prismjs": "^1.26.5",
         "@types/react": "^18.2.0",
         "@types/react-dom": "^18.2.0",
         "axios": "^1.6.2",
+        "prismjs": "^1.30.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-scripts": "^5.0.1",
