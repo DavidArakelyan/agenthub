@@ -3,11 +3,14 @@ fastapi>=0.68.0
 uvicorn>=0.15.0
 pydantic>=1.8.0
 python-multipart>=0.0.5
-langchain>=0.0.267
+langchain>=0.1.0,<0.2.0
+langchain-core>=0.1.21,<0.2.0
+langchain-community>=0.0.20
 langchain-openai>=0.0.2
 chromadb>=0.4.0
 sentence-transformers>=2.2.2
 python-dotenv>=0.19.0
+langsmith>=0.0.83,<0.1.0
 
 # Testing dependencies
 pytest>=7.0.0
@@ -16,5 +19,5 @@ pytest-cov>=4.1.0
 httpx>=0.24.0
 pydantic-settings>=2.0.0
 
-langchain-chroma
-langchain-huggingface 
+langchain-chroma>=0.2.3
+langchain-huggingface

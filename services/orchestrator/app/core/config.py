@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     main_model_temperature: float = 0.7
 
     # Code generation model
-    code_model_name: str = "o3"
+    # main_model_name: str = "o3"
+    code_model_name: str = "gpt-4.1"
     code_model_temperature: float = 0.2
 
     # Document generation model
