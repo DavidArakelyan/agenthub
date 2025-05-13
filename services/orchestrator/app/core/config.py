@@ -4,16 +4,13 @@ Configuration management for the orchestrator service.
 
 from functools import lru_cache
 from pydantic_settings import BaseSettings
-from pydantic import Field  # noqa: F401
+from pydantic import Field
 from dotenv import load_dotenv
 import os
 
 # Load top-level .env file
 env_path = os.path.join(
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    ),
-    ".env",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env"
 )
 load_dotenv(env_path)
 
@@ -26,22 +23,22 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Agent Orchestrator"
 
     # OpenAI Configuration
-    OPENAI_API_KEY: str
+    openai_api_key: str = Field(default=os.getenv("OPENAI_API_KEY"))
 
     # Service Configuration
     environment: str = "development"
     debug: bool = False
 
     # Model Configurations
-    # Main decision making model (o4-mini)
-    main_model_name: str = "o4-mini"
+    # main_model_name: str = "o4-mini"
+    main_model_name: str = "gpt-4"
     main_model_temperature: float = 0.7
 
-    # Code generation model (o3)
+    # Code generation model
     code_model_name: str = "o3"
     code_model_temperature: float = 0.2
 
-    # Document generation model (GPT-4.1)
+    # Document generation model
     document_model_name: str = "gpt-4.1"
     document_model_temperature: float = 0.7
 
@@ -63,9 +60,12 @@ class Settings(BaseSettings):
 
         env_file = env_path
         case_sensitive = True
-        env_prefix = ""
         extra = "ignore"
-        validate_by_name = True
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
 
 
 @lru_cache()

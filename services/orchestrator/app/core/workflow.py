@@ -4,7 +4,7 @@ Core workflow implementation using LangGraph for agent orchestration.
 
 from typing import Annotated, Any, Dict, List, TypedDict, Literal  # noqa: F401
 from langgraph.graph import Graph, StateGraph
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import BaseMessage
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -69,21 +69,25 @@ def create_agent_workflow() -> Graph:
                         "3. If it requires code generation (specify language: cpp, py, java)\n"
                         "4. If it requires document generation (specify format: txt, doc, pdf)\n"
                         "Return a JSON with the following structure:\n"
-                        "{\n"
+                        '{{\n'
                         '  "query_type": "simple" | "complex",\n'
                         '  "needs_web_search": boolean,\n'
                         '  "needs_document_processing": boolean,\n'
                         '  "generation_type": "code" | "document" | "none",\n'
                         '  "target_format": "cpp" | "py" | "java" | "txt" | "doc" | "pdf" | "none"\n'
-                        "}",
+                        "}}\n",
                     ),
-                    ("human", "{input}"),
+                    ("human", "Query: {input}"),
                 ]
             )
             chain = prompt | llm
 
             # Get the query from state
             query = state["messages"][-1].content
+
+            # Initialize task status if not present
+            if "task_status" not in state:
+                state["task_status"] = {}
 
             # Classify query and parse the response
             classification = chain.invoke({"input": query})
@@ -201,7 +205,7 @@ def create_agent_workflow() -> Graph:
                                 state["target_format"], "Write clean, documented code."
                             ),
                         ),
-                        ("human", "{query}"),
+                        ("human", "Task: {input}"),
                     ]
                 )
 
@@ -210,7 +214,7 @@ def create_agent_workflow() -> Graph:
                 # Generate code based on the last message and context
                 code_response = chain.invoke(
                     {
-                        "query": state["messages"][-1].content,
+                        "input": state["messages"][-1].content,
                     }
                 )
 
@@ -247,7 +251,7 @@ def create_agent_workflow() -> Graph:
                                 "Generate well-structured content.",
                             ),
                         ),
-                        ("human", "{query}"),
+                        ("human", "Task: {input}"),
                     ]
                 )
 
@@ -256,7 +260,7 @@ def create_agent_workflow() -> Graph:
                 # Generate document based on the last message and context
                 doc_response = chain.invoke(
                     {
-                        "query": state["messages"][-1].content,
+                        "input": state["messages"][-1].content,
                     }
                 )
 
@@ -301,11 +305,11 @@ def create_agent_workflow() -> Graph:
                         "You are a helpful assistant that generates responses based on collected information. "
                         "If code or document was generated, reference it in your response.",
                     ),
-                    ("human", "{context}"),
+                    ("human", "Input: {input}"),
                 ]
             )
             chain = prompt | llm
-            response = chain.invoke({"context": str(state["context"])})
+            response = chain.invoke({"input": str(state["context"])})
 
             # Update state
             state["messages"].append(SystemMessage(content=str(response)))
