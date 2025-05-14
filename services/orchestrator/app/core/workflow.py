@@ -35,6 +35,7 @@ class CodeLanguage(str, Enum):
     """Supported programming languages."""
 
     PYTHON = "py"
+    TYPESCRIPT = "ts"
     CPP = "cpp"
     JAVA = "java"
 
@@ -43,6 +44,7 @@ class DocumentFormat(str, Enum):
     """Supported document formats."""
 
     TEXT = "txt"
+    MARKDOWN = "md"
     DOC = "doc"
     PDF = "pdf"
 
@@ -79,7 +81,7 @@ class AgentState(TypedDict):
     query: Union[SimpleQuery, ComplexQuery]  # New unified query model
 
 
-def web_searcher(state: AgentState) -> AgentState:
+async def web_searcher(state: AgentState) -> AgentState:
     """Performs web search based on the task requirements."""
     try:
         if not state["query"].needs_web_search:
@@ -181,6 +183,14 @@ def code_generator(state: AgentState) -> AgentState:
                 "4. Include error handling where appropriate\n"
                 "5. Add comments for complex logic\n"
             ),
+            CodeLanguage.TYPESCRIPT: (
+                "Generate TypeScript code following these guidelines:\n"
+                "1. Use strict type checking\n"
+                "2. Follow Airbnb TypeScript style guide\n"
+                "3. Include JSDoc comments\n"
+                "4. Use async/await for asynchronous code\n"
+                "5. Include error handling with try/catch\n"
+            ),
             CodeLanguage.CPP: (
                 "Generate C++ code following these guidelines:\n"
                 "1. Use modern C++17 features\n"
@@ -213,7 +223,10 @@ def code_generator(state: AgentState) -> AgentState:
 
         chain = prompt | llm
         code_response = chain.invoke({"input": state["query"].content})
-
+        # Log the raw response
+        logger.info(f"Raw LLM Response: {code_response}")
+        logger.info(f"Raw LLM Response Content: {code_response.content}")
+        # Update state with generated code
         state["context"]["generated_code"] = code_response.content
         state["context"]["code_generation_completed"] = True
         logger.info(f"Code generation completed for {state['query'].code_language}")
@@ -249,6 +262,14 @@ def document_generator(state: AgentState) -> AgentState:
                 "4. Keep line lengths reasonable\n"
                 "5. Use ASCII characters only\n"
             ),
+            DocumentFormat.MARKDOWN: (
+                "Generate Markdown content following these guidelines:\n"
+                "1. Use proper Markdown syntax for headings\n"
+                "2. Include links and images with proper syntax\n"
+                "3. Use code blocks for code snippets\n"
+                "4. Include lists and tables with proper formatting\n"
+                "5. Use blockquotes for citations\n"
+            ),
             DocumentFormat.DOC: (
                 "Generate Word-compatible content following these guidelines:\n"
                 "1. Use proper heading levels (H1, H2, etc.)\n"
@@ -279,10 +300,12 @@ def document_generator(state: AgentState) -> AgentState:
                 ("human", "Task: {input}"),
             ]
         )
-
         chain = prompt | llm
         doc_response = chain.invoke({"input": state["query"].content})
-
+        # Log the raw response
+        logger.info(f"Raw LLM Response: {doc_response}")
+        logger.info(f"Raw LLM Response Content: {doc_response.content}")
+        # Update state with generated document
         state["context"]["generated_document"] = doc_response.content
         state["context"]["document_generation_completed"] = True
         logger.info(
@@ -372,10 +395,11 @@ def response_generator(state: AgentState) -> AgentState:
                     "format": state["query"].document_format,
                     "content": state["context"].get("generated_document", ""),
                 }
-
         chain = prompt | llm
         response = chain.invoke({"context": str(state["context"])})
-
+        # Log the raw response
+        logger.info(f"Raw LLM Response: {response}")
+        logger.info(f"Raw LLM Response Content: {response.content}")
         # Update state
         state["messages"].append(SystemMessage(content=str(response)))
         state["current_step"] = "end"
@@ -397,7 +421,6 @@ class AgentWorkflow:
         """Invoke the workflow asynchronously."""
         try:
             logger.info(f"Processing state: {state}")
-
             # Execute the workflow
             result = await self.workflow.ainvoke(state)
             logger.info(f"Workflow completed with result: {result}")
@@ -421,31 +444,47 @@ def create_agent_workflow() -> Graph:
         def query_type_classifier(state: AgentState) -> AgentState:
             """First level classification: Simple vs Complex"""
             llm = ChatOpenAI(temperature=0.2, model_name=settings.main_model_name)
+
+            system_prompt = (
+                "You are a query classification agent. \n"
+                "Classify if this query requires generation (code/document) or can be answered directly.\n"
+                "Analyze the query and determine:\n"
+                "1. If it's a simple query (no code or document generation requested): set 'type' in Response JSON to 'simple'\n"
+                "2. If it's a complex query (needs code/doc generation): set 'type' in Response JSON to 'complex'\n"
+                "3. Determine if it needs web search (needs recent info, past cutoff date): set 'needs_web_search' boolean to true\n"
+                "4. Determine if it needs document processing (has additional context): set 'needs_document_processing' boolean to true\n"
+                'Return a JSON with following structure:\n"'
+                '{{"type": "simple" or "complex", "needs_web_search": boolean, "needs_document_processing": boolean}}'
+            )
             prompt = ChatPromptTemplate.from_messages(
                 [
-                    (
-                        "system",
-                        "Classify if this query requires generation (code/document) or can be answered directly.\n"
-                        'Return JSON: {{"type": "simple" or "complex", "needs_web_search": boolean, '
-                        '"needs_document_processing": boolean}}',
-                    ),
+                    ("system", system_prompt),
                     ("human", "{query}"),
                 ]
             )
             chain = prompt | llm
             response = chain.invoke({"query": state["messages"][-1].content})
-            result = json.loads(response.content)  # Get the content first
+            # Log the raw response
+            logger.info(f"Raw LLM Response: {response}")
+            logger.info(f"Raw LLM Response Content: {response.content}")
+            # Parse the response content
+            result = json.loads(response.content)
 
             if result["type"] == "simple":
+                # For simple queries, we can directly set the query type
+                # and skip further classification
                 state["query"] = SimpleQuery(
                     content=state["messages"][-1].content,
                     needs_web_search=result["needs_web_search"],
                     needs_document_processing=result["needs_document_processing"],
                 )
             else:
-                # Just mark as complex, details will be filled by generator_classifier
+                # For complex queries, we need to set the generator type to NONE initially
+                # and let the generator type classifier determine the actual type
                 state["query"] = ComplexQuery(
                     content=state["messages"][-1].content,
+                    needs_web_search=result["needs_web_search"],
+                    needs_document_processing=result["needs_document_processing"],
                     generator_type=GeneratorType.NONE,
                 )
             return state
@@ -456,21 +495,33 @@ def create_agent_workflow() -> Graph:
                 return state
 
             llm = ChatOpenAI(temperature=0.2, model_name=settings.main_model_name)
+            system_prompt = (
+                "You are a classification agent determining the type of generation required. \n"
+                "Analyze this query and determine if it needs code or document generation.\n"
+                "Code generation is needed for:\n"
+                "- Writing functions, classes, or programs\n"
+                "- Implementing algorithms or data structures\n"
+                "- Creating scripts or applications\n\n"
+                "Document generation is needed for:\n"
+                "- Creating documentation or reports\n"
+                "- Generating formatted text content\n"
+                "- Producing structured documents\n\n"
+                'Return JSON: {{"generator_type": "code" or "document"}}',
+            )
             prompt = ChatPromptTemplate.from_messages(
                 [
-                    (
-                        "system",
-                        "Determine if this query needs code or document generation.\n"
-                        'Return JSON: {{"generator_type": "code" or "document"}}',
-                    ),
+                    ("system", system_prompt),
                     ("human", "{query}"),
                 ]
             )
-
             chain = prompt | llm
             response = chain.invoke({"query": state["query"].content})
+            # Log the raw response
+            logger.info(f"Raw LLM Response: {response}")
+            logger.info(f"Raw LLM Response Content: {response.content}")
+            # Parse the response content
             result = json.loads(response.content)  # Get the content first
-
+            # Update the state with the generator type
             state["query"].generator_type = GeneratorType(result["generator_type"])
             return state
 
@@ -482,38 +533,105 @@ def create_agent_workflow() -> Graph:
             llm = ChatOpenAI(temperature=0.2, model_name=settings.main_model_name)
 
             if state["query"].generator_type == GeneratorType.CODE:
+                system_prompt = (
+                    "You are a programming language classification agent. \n"
+                    "Analyze this query and determine the required programming language for the task.\n"
+                    "Consider the following languages:\n"
+                    "- Python (py)\n"
+                    "- Typescript (ts)\n"
+                    "- C++ (cpp)\n"
+                    "- Java (java)\n\n"
+                    "If user has specified a language, use that. Otherwise, classify based on the task.\n"
+                    "Determine the best programming language for this task:\n"
+                    "For example:\n"
+                    "Python (py):\n"
+                    "- Scripting and automation\n"
+                    "- Data processing and analysis\n"
+                    "- Web applications and APIs\n"
+                    "- Machine learning and AI\n\n"
+                    "Typescript (ts)\n"
+                    "- Web applications (frontend/backend)\n"
+                    "- Node.js applications\n"
+                    "- Type-safe JavaScript projects\n"
+                    "- Large-scale applications (frontend)\n\n"
+                    "C++ (cpp):\n"
+                    "- Performance-critical applications\n"
+                    "- Systems programming\n"
+                    "- Game development\n"
+                    "- Resource-constrained environments\n\n"
+                    "Java (java):\n"
+                    "- Enterprise applications\n"
+                    "- Android development\n"
+                    "- Large-scale systems (backend)\n"
+                    "- Cross-platform desktop apps\n\n"
+                    "If nothing is specified or matches the description specified, return 'py' as default."
+                    'Return JSON: {{"language": "py" or "ts" or "cpp" or "java"}}'
+                )
                 prompt = ChatPromptTemplate.from_messages(
                     [
-                        (
-                            "system",
-                            "Determine best language (py/cpp/java) for this code task.\n"
-                            'Return JSON: {{"language": "py" or "cpp" or "java"}}',
-                        ),
+                        ("system", system_prompt),
                         ("human", "{query}"),
                     ]
                 )
                 chain = prompt | llm
                 response = chain.invoke({"query": state["query"].content})
-                result = json.loads(response.content)  # Get the content first
 
+                # Log the raw response
+                logger.info(f"Raw LLM Response: {response}")
+                logger.info(f"Raw LLM Response Content: {response.content}")
+
+                # Parse the response content
+                result = json.loads(response.content)  # Get the content first
+                # Update the state with the language information
                 state["query"].code_language = CodeLanguage(result["language"])
 
             elif state["query"].generator_type == GeneratorType.DOCUMENT:
+                system_prompt = (
+                    "You are a document format classification agent. \n"
+                    "Analyze this query and determine the required document format for the task.\n"
+                    "Consider the following formats:\n"
+                    "- Text (txt): for plain text content\n"
+                    "- Markdown (md): for formatted text content\n"
+                    "- Doc (doc): for formatted documents\n"
+                    "- PDF (pdf): for formal documents and reports\n"
+                    "If user has specified a particular format, use that. Otherwise, classify based on the task.\n"
+                    "Determine the best document format for this content:\n"
+                    "Text (txt):\n"
+                    "- Simple, unformatted content\n"
+                    "- Simple readme files and notes\n"
+                    "- Configuration files\n"
+                    "- Quick documentation\n\n"
+                    "Markdown (md):\n"
+                    "- Documentation with formatting\n"
+                    "- README files with links\n"
+                    "- Content needing version control\n"
+                    "- Blogs and articles\n\n"
+                    "Word Document (doc):\n"
+                    "- Formatted text with styles\n"
+                    "- Documents needing revision\n"
+                    "- Interactive content\n"
+                    "- Collaborative editing\n\n"
+                    "PDF (pdf):\n"
+                    "- Final documentation\n"
+                    "- Formal reports\n"
+                    "- Print-ready documents\n"
+                    "- Long-term archival\n\n"
+                    'Return JSON: {{"format": "txt" or "md" or "doc" or "pdf"}}'
+                )
                 prompt = ChatPromptTemplate.from_messages(
                     [
-                        (
-                            "system",
-                            "Determine best format (txt/doc/pdf) for this document.\n"
-                            'Return JSON: {{"format": "txt" or "doc" or "pdf"}}',
-                        ),
+                        ("system", system_prompt),
                         ("human", "{query}"),
                     ]
                 )
                 chain = prompt | llm
                 response = chain.invoke({"query": state["query"].content})
+                # Log the raw response
+                logger.info(f"Raw LLM Response: {response}")
+                logger.info(f"Raw LLM Response Content: {response.content}")
+                # Parse the response content
                 result = json.loads(response.content)  # Get the content first
-                # chain = prompt | llm
-                # result = json.loads(chain.invoke({"query": state["query"].content}))
+                # Update the state with the format information
                 state["query"].document_format = DocumentFormat(result["format"])
 
             return state
