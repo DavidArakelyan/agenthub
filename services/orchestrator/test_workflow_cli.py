@@ -10,10 +10,22 @@ from fastapi import FastAPI
 from app.core.workflow import create_agent_workflow, initialize_state
 from app.core.config import get_settings
 from app.core.mcp_client import init_mcp
+from app.core.query import SimpleQuery, ComplexQuery
 import logging
+import sys
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging to show all logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # This ensures logs go to the Debug Console
+    ]
+)
+
+# Set log level for specific loggers
+logging.getLogger('app.core.workflow').setLevel(logging.DEBUG)
+logging.getLogger('langchain').setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize settings
@@ -26,6 +38,7 @@ init_mcp(app)
 
 async def main():
     """Main CLI interface for testing the workflow."""
+    logger.info("Starting AgentHub Workflow CLI Tester")
     print("Welcome to AgentHub Workflow CLI Tester")
     print("=======================================")
 
@@ -35,40 +48,57 @@ async def main():
         message = input("> ")
 
         if message.lower() == "quit":
+            logger.info("Exiting workflow tester")
             break
 
         try:
             # Create workflow
+            logger.info("Creating workflow instance")
             workflow = create_agent_workflow()
 
             # Initialize state with the message
+            logger.info(f"Initializing state with message: {message}")
             state = initialize_state(message)
 
             print("\nProcessing message through workflow...")
             print("-------------------------------------")
 
             # Execute workflow
-            final_state = workflow.invoke(state)
+            logger.info("Executing workflow")
+            final_state = await workflow.ainvoke(state)
+            logger.info("Workflow execution completed")
 
             # Display results
+            logger.debug(f"Final state: {final_state}")
             print("\nWorkflow Results:")
             print("----------------")
-            print(f"Query Type: {final_state['query_type']}")
-            print(f"Generation Type: {final_state['generation_type']}")
-            print(f"Target Format: {final_state['target_format']}")
+            print(f"Query Type: {'simple' if isinstance(final_state['query'], SimpleQuery) else 'complex'}")
+            
+            if isinstance(final_state['query'], ComplexQuery):
+                print(f"Generation Type: {final_state['query'].generator_type.value}")
+                if final_state['query'].code_language:
+                    print(f"Target Format: {final_state['query'].code_language.value}")
+                elif final_state['query'].document_format:
+                    print(f"Target Format: {final_state['query'].document_format.value}")
+            else:
+                print("Generation Type: none")
+                print("Target Format: none")
+
             print("\nTask Status:")
-            for key, value in final_state["task_status"].items():
+            for key, value in final_state.get("task_status", {}).items():
                 print(f"- {key}: {value}")
 
             # Show generated content if any
             if final_state["context"].get("canvas_content"):
                 content = final_state["context"]["canvas_content"]
+                logger.info(f"Generated {content['type']} content in {content['format']} format")
                 print(f"\nGenerated {content['type']} content ({content['format']}):")
                 print("-" * 40)
                 print(content["content"])
                 print("-" * 40)
 
             # Show final response
+            logger.info("Displaying final response")
             print("\nFinal Response:")
             print(final_state["messages"][-1].content)
 

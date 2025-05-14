@@ -3,6 +3,21 @@
 import pytest
 from app.core.workflow import create_agent_workflow, initialize_state, AgentState
 from langchain.schema import HumanMessage
+import logging
+import sys
+
+# Configure logging to show all logs
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # This ensures logs go to the Debug Console
+    ],
+)
+
+# Set log level for specific loggers
+logging.getLogger("app.core.workflow").setLevel(logging.DEBUG)
+logging.getLogger("langchain").setLevel(logging.INFO)
 
 
 def test_initialize_state():

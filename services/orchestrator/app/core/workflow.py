@@ -2,9 +2,7 @@
 Core workflow implementation using LangGraph for agent orchestration.
 """
 
-from enum import Enum
 from typing import Annotated, Any, Dict, List, TypedDict, Literal, Union, Optional  # noqa: F401
-from pydantic import BaseModel
 from langgraph.graph import Graph, StateGraph
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -12,63 +10,23 @@ from langchain.schema import BaseMessage
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 import logging
+import re
 
 from app.core.config import get_settings
 from app.core.mcp_client import mcp
+from app.core.query import (
+    GeneratorType,
+    CodeLanguage,
+    DocumentFormat,
+    SimpleQuery,
+    ComplexQuery,
+)
 
 settings = get_settings()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class GeneratorType(str, Enum):
-    """Types of generators available in the system."""
-
-    CODE = "code"
-    DOCUMENT = "document"
-    NONE = "none"
-
-
-class CodeLanguage(str, Enum):
-    """Supported programming languages."""
-
-    PYTHON = "py"
-    TYPESCRIPT = "ts"
-    CPP = "cpp"
-    JAVA = "java"
-
-
-class DocumentFormat(str, Enum):
-    """Supported document formats."""
-
-    TEXT = "txt"
-    MARKDOWN = "md"
-    DOC = "doc"
-    PDF = "pdf"
-
-
-class BaseQuery(BaseModel):
-    """Base class for all query types."""
-
-    content: str
-    needs_web_search: bool = False
-    needs_document_processing: bool = False
-
-
-class SimpleQuery(BaseQuery):
-    """Query that can be answered directly without generation."""
-
-    pass
-
-
-class ComplexQuery(BaseQuery):
-    """Query that requires code or document generation."""
-
-    generator_type: GeneratorType = GeneratorType.NONE
-    code_language: Optional[CodeLanguage] = None
-    document_format: Optional[DocumentFormat] = None
 
 
 class AgentState(TypedDict):
@@ -78,7 +36,7 @@ class AgentState(TypedDict):
     current_step: str
     task_status: Dict[str, Any]
     context: Dict[str, Any]
-    query: Union[SimpleQuery, ComplexQuery]  # New unified query model
+    query: Union[SimpleQuery, ComplexQuery]
 
 
 async def web_searcher(state: AgentState) -> AgentState:
@@ -155,7 +113,53 @@ async def document_processor(state: AgentState) -> AgentState:
     return state
 
 
-def code_generator(state: AgentState) -> AgentState:
+def validate_typescript_code(code: str) -> bool:
+    """Validate TypeScript code for best practices and syntax."""
+    validation_rules = [
+        (r"\bvar\b", False, "Avoid using 'var', prefer 'let' or 'const'"),
+        (
+            r"function\s+\w+\s*\([^:)]*\)",
+            False,
+            "Functions should have type annotations",
+        ),
+        (r"(interface|type)\s+\w+", True, "Missing interface or type definition"),
+        (r":\s*[A-Z]\w+(\[\])?", True, "Missing type annotations"),
+        (
+            r"React\.(FC|FunctionComponent)<",
+            True,
+            "React components should use TypeScript generics",
+        ),
+    ]
+
+    issues = []
+    for pattern, should_exist, message in validation_rules:
+        matches = bool(re.search(pattern, code))
+        if should_exist != matches:
+            issues.append(message)
+
+    return len(issues) == 0
+
+
+def validate_markdown_syntax(content: str) -> bool:
+    """Validate Markdown content for proper syntax and structure."""
+    validation_rules = [
+        (r"^#{1,6}\s.+$", True, "Headers should have space after #"),
+        (r"```[\w]*\n[\s\S]*?\n```", True, "Code blocks should be properly formatted"),
+        (r"\[([^\]]+)\]\(([^)]+)\)", True, "Links should have both text and target"),
+        (r"^\s*[-*+]\s.+$", True, "Lists should be properly formatted"),
+        (r"\|.+\|\n\|[-:|\s]+\|", True, "Tables should have header separators"),
+    ]
+
+    issues = []
+    for pattern, should_exist, message in validation_rules:
+        matches = bool(re.search(pattern, content, re.MULTILINE))
+        if should_exist != matches:
+            issues.append(message)
+
+    return len(issues) == 0
+
+
+async def code_generator(state: AgentState) -> AgentState:
     """Generates code in the specified programming language."""
     try:
         if (
@@ -226,6 +230,34 @@ def code_generator(state: AgentState) -> AgentState:
         # Log the raw response
         logger.info(f"Raw LLM Response: {code_response}")
         logger.info(f"Raw LLM Response Content: {code_response.content}")
+
+        # Add validation for TypeScript
+        if state["query"].code_language == CodeLanguage.TYPESCRIPT:
+            if not validate_typescript_code(code_response.content):
+                logger.warning(
+                    "Generated TypeScript code doesn't follow best practices"
+                )
+                # Regenerate with stricter guidelines
+                typescript_strict_prompt = (
+                    "Improve this TypeScript code following best practices:\n"
+                    "1. Use strict type checking\n"
+                    "2. Follow Airbnb TypeScript style guide\n"
+                    "3. Include JSDoc comments\n"
+                    "4. Use async/await for asynchronous code\n"
+                    "5. Include error handling with try/catch\n"
+                )
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        ("system", typescript_strict_prompt),
+                        (
+                            "human",
+                            "Improve this TypeScript code following best practices:\n{code}",
+                        ),
+                    ]
+                )
+                chain = prompt | llm
+                code_response = chain.invoke({"code": code_response.content})
+
         # Update state with generated code
         state["context"]["generated_code"] = code_response.content
         state["context"]["code_generation_completed"] = True
@@ -237,7 +269,7 @@ def code_generator(state: AgentState) -> AgentState:
     return state
 
 
-def document_generator(state: AgentState) -> AgentState:
+async def document_generator(state: AgentState) -> AgentState:
     """Generates documents in the specified format."""
     try:
         if (
@@ -305,7 +337,32 @@ def document_generator(state: AgentState) -> AgentState:
         # Log the raw response
         logger.info(f"Raw LLM Response: {doc_response}")
         logger.info(f"Raw LLM Response Content: {doc_response.content}")
-        # Update state with generated document
+
+        # Add validation for Markdown
+        if state["query"].document_format == DocumentFormat.MARKDOWN:
+            if not validate_markdown_syntax(doc_response.content):
+                logger.warning("Generated Markdown doesn't follow best practices")
+                # Regenerate with stricter guidelines
+                markdown_strict_prompt = (
+                    "Improve this Markdown following best practices:\n"
+                    "1. Use proper Markdown syntax for headings\n"
+                    "2. Include links and images with proper syntax\n"
+                    "3. Use code blocks for code snippets\n"
+                    "4. Include lists and tables with proper formatting\n"
+                    "5. Use blockquotes for citations\n"
+                )
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        ("system", markdown_strict_prompt),
+                        (
+                            "human",
+                            "Improve this Markdown following best practices:\n{doc}",
+                        ),
+                    ]
+                )
+                chain = prompt | llm
+                doc_response = chain.invoke({"doc": doc_response.content})
+
         state["context"]["generated_document"] = doc_response.content
         state["context"]["document_generation_completed"] = True
         logger.info(
@@ -367,6 +424,7 @@ def response_generator(state: AgentState) -> AgentState:
                 ]
             )
         else:
+            # For simple queries, include the query in the prompt
             prompt = ChatPromptTemplate.from_messages(
                 [
                     (
@@ -377,7 +435,10 @@ def response_generator(state: AgentState) -> AgentState:
                         "3. Processed documents if analyzed\n"
                         "Synthesize the information into a clear, concise response.\n",
                     ),
-                    ("human", "Context: {context}\nProvide a comprehensive answer."),
+                    (
+                        "human",
+                        "Query: {query}\nContext: {context}\nProvide a comprehensive answer.",
+                    ),
                 ]
             )
 
@@ -395,13 +456,19 @@ def response_generator(state: AgentState) -> AgentState:
                     "format": state["query"].document_format,
                     "content": state["context"].get("generated_document", ""),
                 }
+
+        # Pass both query and context to the chain
         chain = prompt | llm
-        response = chain.invoke({"context": str(state["context"])})
+        response = chain.invoke(
+            {"query": state["query"].content, "context": str(state["context"])}
+        )
+
         # Log the raw response
-        logger.info(f"Raw LLM Response: {response}")
-        logger.info(f"Raw LLM Response Content: {response.content}")
-        # Update state
-        state["messages"].append(SystemMessage(content=str(response)))
+        logger.info(f"Raw LLM Response: {response}\n")
+        logger.info(f"Raw LLM Response Content: {response.content}\n")
+
+        # Update state with just the content of the response
+        state["messages"].append(SystemMessage(content=response.content))
         state["current_step"] = "end"
         return state
     except Exception as e:
@@ -438,12 +505,24 @@ class AgentWorkflow:
 
 def create_agent_workflow() -> Graph:
     """Creates the main agent workflow using LangGraph."""
+    logger.info("Creating the main agent workflow using LangGraph...\n")
     try:
         workflow = StateGraph(AgentState)
 
         def query_type_classifier(state: AgentState) -> AgentState:
             """First level classification: Simple vs Complex"""
+            logger.info("First level classification: Simple vs Complex...\n")
             llm = ChatOpenAI(temperature=0.2, model_name=settings.main_model_name)
+
+            # Preserve existing generator type and language/format if already set
+            existing_generator_type = None
+            existing_code_language = None
+            existing_document_format = None
+
+            if isinstance(state["query"], ComplexQuery):
+                existing_generator_type = state["query"].generator_type
+                existing_code_language = state["query"].code_language
+                existing_document_format = state["query"].document_format
 
             system_prompt = (
                 "You are a query classification agent. \n"
@@ -451,46 +530,51 @@ def create_agent_workflow() -> Graph:
                 "Analyze the query and determine:\n"
                 "1. If it's a simple query (no code or document generation requested): set 'type' in Response JSON to 'simple'\n"
                 "2. If it's a complex query (needs code/doc generation): set 'type' in Response JSON to 'complex'\n"
-                "3. Determine if it needs web search (needs recent info, past cutoff date): set 'needs_web_search' boolean to true\n"
-                "4. Determine if it needs document processing (has additional context): set 'needs_document_processing' boolean to true\n"
-                'Return a JSON with following structure:\n"'
-                '{{"type": "simple" or "complex", "needs_web_search": boolean, "needs_document_processing": boolean}}'
+                "3. Determine if it needs web search (needs recent info, past cutoff date): set 'needs_web_search' boolean\n"
+                "4. Determine if it needs document processing (has additional context): set 'needs_document_processing' boolean\n"
+                'Return JSON: {{"type": "simple" or "complex", "needs_web_search": boolean, "needs_document_processing": boolean}}'
             )
             prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_prompt),
-                    ("human", "{query}"),
-                ]
+                [("system", system_prompt), ("human", "{query}")]
             )
             chain = prompt | llm
             response = chain.invoke({"query": state["messages"][-1].content})
             # Log the raw response
-            logger.info(f"Raw LLM Response: {response}")
-            logger.info(f"Raw LLM Response Content: {response.content}")
-            # Parse the response content
+            logger.info(f"Raw LLM Response (Query Classifier): {response}\n")
+            logger.info(
+                f"Raw LLM Response Content (Query Classifier): {response.content}\n"
+            )
             result = json.loads(response.content)
 
             if result["type"] == "simple":
-                # For simple queries, we can directly set the query type
-                # and skip further classification
                 state["query"] = SimpleQuery(
                     content=state["messages"][-1].content,
                     needs_web_search=result["needs_web_search"],
                     needs_document_processing=result["needs_document_processing"],
                 )
             else:
-                # For complex queries, we need to set the generator type to NONE initially
-                # and let the generator type classifier determine the actual type
                 state["query"] = ComplexQuery(
                     content=state["messages"][-1].content,
                     needs_web_search=result["needs_web_search"],
                     needs_document_processing=result["needs_document_processing"],
-                    generator_type=GeneratorType.NONE,
+                    generator_type=existing_generator_type or GeneratorType.NONE,
+                    code_language=existing_code_language,
+                    document_format=existing_document_format,
                 )
+                # Add debug logging before return
+
+            logger.debug(f"Query type classification result: {result}")
+            logger.debug(f"Query type: {type(state['query'])}")
             return state
 
         def generator_type_classifier(state: AgentState) -> AgentState:
             """Second level: Classify between Code vs Document generation"""
+            logger.info(
+                "Second level: Classify between Code vs Document generation...\n"
+            )
+            # Add entry logging
+            logger.info("Entering generator_type_classifier")
+            logger.debug(f"State entering generator_type_classifier: {state}")
             if not isinstance(state["query"], ComplexQuery):
                 return state
 
@@ -517,8 +601,10 @@ def create_agent_workflow() -> Graph:
             chain = prompt | llm
             response = chain.invoke({"query": state["query"].content})
             # Log the raw response
-            logger.info(f"Raw LLM Response: {response}")
-            logger.info(f"Raw LLM Response Content: {response.content}")
+            logger.info(f"Raw LLM Response (Generation Type Classifier): {response}\n")
+            logger.info(
+                f"Raw LLM Response Content (Generation Type Classifier): {response.content}\n"
+            )
             # Parse the response content
             result = json.loads(response.content)  # Get the content first
             # Update the state with the generator type
@@ -527,6 +613,7 @@ def create_agent_workflow() -> Graph:
 
         def format_classifier(state: AgentState) -> AgentState:
             """Third level: Classify specific language/format"""
+            logger.info("Third level: Classify specific language/format...\n")
             if not isinstance(state["query"], ComplexQuery):
                 return state
 
@@ -577,11 +664,13 @@ def create_agent_workflow() -> Graph:
                 response = chain.invoke({"query": state["query"].content})
 
                 # Log the raw response
-                logger.info(f"Raw LLM Response: {response}")
-                logger.info(f"Raw LLM Response Content: {response.content}")
+                logger.info(f"Raw LLM Response (Language Classifier): {response}\n")
+                logger.info(
+                    f"Raw LLM Response Content (Language Classifier): {response.content}\n"
+                )
 
                 # Parse the response content
-                result = json.loads(response.content)  # Get the content first
+                result = json.loads(response.content)
                 # Update the state with the language information
                 state["query"].code_language = CodeLanguage(result["language"])
 
@@ -627,8 +716,10 @@ def create_agent_workflow() -> Graph:
                 chain = prompt | llm
                 response = chain.invoke({"query": state["query"].content})
                 # Log the raw response
-                logger.info(f"Raw LLM Response: {response}")
-                logger.info(f"Raw LLM Response Content: {response.content}")
+                logger.info(f"Raw LLM Response (Format Classifier): {response}\n")
+                logger.info(
+                    f"Raw LLM Response Content (Format Classifier): {response.content}\n"
+                )
                 # Parse the response content
                 result = json.loads(response.content)  # Get the content first
                 # Update the state with the format information
@@ -646,32 +737,44 @@ def create_agent_workflow() -> Graph:
         workflow.add_node("document_generator", document_generator)
         workflow.add_node("response_generator", response_generator)
 
-        # Define hierarchical routing
+        def is_complex_query(s):
+            result = isinstance(s["query"], ComplexQuery)
+            logger.info(f"Edge condition - is_complex_query: {result}")
+            return result
+
+        def is_web_search_needed(s):
+            result = s["query"].needs_web_search
+            logger.info(f"Edge condition - need_web_searcher: {result}")
+            return result
+
+        def is_doc_processing_needed(s):
+            result = (
+                s["query"].needs_document_processing and not s["query"].needs_web_search
+            )
+            logger.info(f"Edge condition - needs_document_processing: {result}")
+            return result
+
+        def is_simple_query(s):
+            result = (
+                isinstance(s["query"], SimpleQuery)
+                and not s["query"].needs_web_search
+                and not s["query"].needs_document_processing
+            )
+            logger.info(f"Edge condition - is_simple_query: {result}")
+            return result
+
         workflow.add_conditional_edges(
             "query_type_classifier",
             {
-                "generator_type_classifier": lambda s: isinstance(
-                    s["query"], ComplexQuery
-                ),
-                "web_searcher": lambda s: s["query"].needs_web_search,
-                "document_processor": lambda s: s["query"].needs_document_processing,
-                "response_generator": lambda s: isinstance(s["query"], SimpleQuery),
+                "generator_type_classifier": is_complex_query,
+                "web_searcher": is_web_search_needed,
+                "document_processor": is_doc_processing_needed,
+                "response_generator": is_simple_query,
             },
         )
 
-        workflow.add_conditional_edges(
-            "generator_type_classifier",
-            {
-                "format_classifier": lambda s: (
-                    isinstance(s["query"], ComplexQuery)
-                    and s["query"].generator_type != GeneratorType.NONE
-                ),
-                "response_generator": lambda s: (
-                    isinstance(s["query"], ComplexQuery)
-                    and s["query"].generator_type == GeneratorType.NONE
-                ),
-            },
-        )
+        # Add explicit edge from generator_type_classifier to format_classifier
+        workflow.add_edge("generator_type_classifier", "format_classifier")
 
         workflow.add_conditional_edges(
             "format_classifier",
@@ -679,12 +782,10 @@ def create_agent_workflow() -> Graph:
                 "code_generator": lambda s: (
                     isinstance(s["query"], ComplexQuery)
                     and s["query"].generator_type == GeneratorType.CODE
-                    and s["query"].code_language is not None
                 ),
                 "document_generator": lambda s: (
                     isinstance(s["query"], ComplexQuery)
                     and s["query"].generator_type == GeneratorType.DOCUMENT
-                    and s["query"].document_format is not None
                 ),
             },
         )
@@ -692,9 +793,11 @@ def create_agent_workflow() -> Graph:
         workflow.add_conditional_edges(
             "web_searcher",
             {
+                "document_processor": lambda s: s["query"].needs_document_processing,
                 "generator_type_classifier": lambda s: isinstance(
                     s["query"], ComplexQuery
-                ),
+                )
+                and not s["query"].needs_document_processing,
                 "response_generator": lambda s: isinstance(s["query"], SimpleQuery),
             },
         )
@@ -715,8 +818,10 @@ def create_agent_workflow() -> Graph:
 
         # Set entry point
         workflow.set_entry_point("query_type_classifier")
+        graph = workflow.compile()
 
-        return workflow.compile()
+        return graph
+
     except Exception as e:
         logger.error(f"Error creating agent workflow: {str(e)}")
         raise
