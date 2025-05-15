@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"name": "AgentHub",
+			"path": "."
+		},
+		{
+			"name": "Orchestrator",
+			"path": "services/orchestrator"
+		},
+		{
+			"name": "FrontEnd",
+			"path": "services/frontend"
+		},
+		{
+			"name": "Document Service",
+			"path": "services/documents"
+		},
+		{
+			"name": "Web-Search Service",
+			"path": "services/websearch"
+		}
+		// Add other services as needed
+	],
+	"settings": {
+		"[python]": {
+			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "ms-python.python"
+		}
+	}
+}

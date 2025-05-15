@@ -18,6 +18,7 @@ venv/**/*.pyd
 
 # Misc
 .DS_Store
+*.env
 .env.local
 .env.development.local
 .env.test.local
@@ -30,7 +31,8 @@ yarn-error.log*
 
 # IDE
 .idea/
-.vscode/
+.vscode/temp/*
+.vscode/*.log
 *.swp
 *.swo
 

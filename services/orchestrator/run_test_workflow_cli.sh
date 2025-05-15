@@ -4,4 +4,4 @@
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 # Run the workflow CLI
-python test_workflow_cli.py
+python tests/test_workflow_cli.py
