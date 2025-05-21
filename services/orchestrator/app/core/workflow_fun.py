@@ -1,7 +1,7 @@
 from langgraph.graph import Graph, StateGraph, END
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from typing import TypedDict, List, Literal, Dict
+from typing import TypedDict, List, Literal, Dict  # noqa: F401
 import logging
 import traceback
 
@@ -54,7 +54,7 @@ def generate_response(state: AgentState) -> AgentState:
 
         llm = ChatOpenAI(
             temperature=temperature,
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-4.1",
             openai_api_key=settings.openai_api_key,
         )
 

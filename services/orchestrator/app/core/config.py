@@ -3,16 +3,31 @@ Configuration management for the orchestrator service.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field
 from dotenv import load_dotenv
 import os
 
-# Load top-level .env file
-env_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".env"
-)
-load_dotenv(env_path)
+# Configure logging
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+def load_environment() -> None:
+    """Load environment variables from workspace root."""
+    workspace_env = Path(__file__).resolve().parents[4] / ".env"
+    logger.debug(f"Looking for .env at: {workspace_env}")
+    if workspace_env.exists():
+        logger.info(f"Loading environment from {workspace_env}")
+        load_dotenv(dotenv_path=workspace_env, verbose=True, override=True)
+    else:
+        logger.warning(f"No .env file found at {workspace_env}")
+
+
+# Load environment variables from root .env file
+load_environment()
 
 
 class Settings(BaseSettings):
@@ -22,8 +37,15 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Agent Orchestrator"
 
-    # OpenAI Configuration
-    openai_api_key: str = Field(default=os.getenv("OPENAI_API_KEY"))
+    # OpenAI Configuration - will be loaded from environment
+    openai_api_key: str = os.environ.get("OPENAI_API_KEY")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        logger.debug(f"Initializing Settings with OpenAI key: {self.openai_api_key}")
+        if not self.openai_api_key:
+            logger.error("OpenAI API key is not set!")
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
 
     # Service Configuration
     environment: str = "development"
@@ -31,7 +53,7 @@ class Settings(BaseSettings):
 
     # Model Configurations
     # main_model_name: str = "o4-mini"
-    main_model_name: str = "gpt-4"
+    main_model_name: str = "gpt-4.1"
     main_model_temperature: float = 0.7
 
     # Code generation model
@@ -56,17 +78,7 @@ class Settings(BaseSettings):
         "http://localhost:8002",  # Web Search
     ]
 
-    class Config:
-        """Pydantic config class."""
-
-        env_file = env_path
-        case_sensitive = True
-        extra = "ignore"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if not self.openai_api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+    # No need for model_post_init, Pydantic will validate required fields
 
 
 @lru_cache()

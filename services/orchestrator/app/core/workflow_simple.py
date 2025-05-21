@@ -10,14 +10,10 @@ from langchain.schema import BaseMessage
 from langchain_core.messages import HumanMessage, SystemMessage
 import json
 import logging
-import re
 
 from app.core.config import get_settings
-from app.core.mcp_client import mcp
 from app.core.query import (
     GeneratorType,
-    CodeLanguage,
-    DocumentFormat,
     SimpleQuery,
     ComplexQuery,
 )

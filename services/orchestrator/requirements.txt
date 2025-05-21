@@ -2,6 +2,7 @@
 fastapi
 uvicorn
 pydantic
+pydantic_settings
 python-dotenv
 python-multipart
 pytest

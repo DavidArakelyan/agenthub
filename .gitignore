@@ -9,6 +9,12 @@ venv/**/*.so
 venv/**/*.dll
 venv/**/*.pyd
 
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
 # Testing
 /coverage
 

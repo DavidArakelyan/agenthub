@@ -7,7 +7,10 @@ This script allows you to interact with the workflow without needing the web fro
 import asyncio
 from pathlib import Path
 from fastapi import FastAPI
-from app.core.workflow import create_agent_workflow, initialize_state
+
+# from app.core.workflow import create_agent_workflow, initialize_state
+# from app.core.workflow_simple import create_agent_workflow, initialize_state
+from app.core.workflow_v2 import create_agent_workflow, initialize_state
 from app.core.config import get_settings
 from app.core.mcp_client import init_mcp
 from app.core.query import SimpleQuery, ComplexQuery
@@ -17,15 +20,15 @@ import sys
 # Configure logging to show all logs
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout)  # This ensures logs go to the Debug Console
-    ]
+    ],
 )
 
 # Set log level for specific loggers
-logging.getLogger('app.core.workflow').setLevel(logging.DEBUG)
-logging.getLogger('langchain').setLevel(logging.INFO)
+logging.getLogger("app.core.workflow").setLevel(logging.DEBUG)
+logging.getLogger("langchain").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize settings
@@ -72,14 +75,18 @@ async def main():
             logger.debug(f"Final state: {final_state}")
             print("\nWorkflow Results:")
             print("----------------")
-            print(f"Query Type: {'simple' if isinstance(final_state['query'], SimpleQuery) else 'complex'}")
-            
-            if isinstance(final_state['query'], ComplexQuery):
+            print(
+                f"Query Type: {'simple' if isinstance(final_state['query'], SimpleQuery) else 'complex'}"
+            )
+
+            if isinstance(final_state["query"], ComplexQuery):
                 print(f"Generation Type: {final_state['query'].generator_type.value}")
-                if final_state['query'].code_language:
+                if final_state["query"].code_language:
                     print(f"Target Format: {final_state['query'].code_language.value}")
-                elif final_state['query'].document_format:
-                    print(f"Target Format: {final_state['query'].document_format.value}")
+                elif final_state["query"].document_format:
+                    print(
+                        f"Target Format: {final_state['query'].document_format.value}"
+                    )
             else:
                 print("Generation Type: none")
                 print("Target Format: none")
@@ -91,7 +98,9 @@ async def main():
             # Show generated content if any
             if final_state["context"].get("canvas_content"):
                 content = final_state["context"]["canvas_content"]
-                logger.info(f"Generated {content['type']} content in {content['format']} format")
+                logger.info(
+                    f"Generated {content['type']} content in {content['format']} format"
+                )
                 print(f"\nGenerated {content['type']} content ({content['format']}):")
                 print("-" * 40)
                 print(content["content"])
