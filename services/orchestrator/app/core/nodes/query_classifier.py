@@ -52,8 +52,8 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
     response = chain.invoke({"query": state["messages"][-1].content})
 
     # Log the raw response
-    logger.info(f"Raw LLM Response (Query Classifier): {response}\n")
-    logger.info(f"Raw LLM Response Content (Query Classifier): {response.content}\n")
+    logger.debug(f"Raw LLM Response (Query Classifier): {response}\n")
+    logger.debug(f"Raw LLM Response Content (Query Classifier): {response.content}\n")
 
     result = json.loads(response.content)
 
@@ -73,6 +73,6 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
             document_format=existing_document_format,
         )
 
-    logger.debug(f"Query type classification result: {result}")
-    logger.debug(f"Query type: {type(state['query'])}")
+    logger.info(f"Query type classification result: {result}")
+    logger.info(f"Query type: {type(state['query'])}")
     return state

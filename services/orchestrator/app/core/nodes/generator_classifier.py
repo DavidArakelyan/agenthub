@@ -18,7 +18,7 @@ def generator_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
     logger.info("Second level: Classify between Code vs Document generation...\n")
 
     # Add entry logging
-    logger.info("Entering generator_type_classifier")
+    logger.debug("Entering generator_type_classifier")
     logger.debug(f"State entering generator_type_classifier: {state}")
 
     if not isinstance(state["query"], ComplexQuery):
@@ -55,7 +55,7 @@ def generator_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
     response = chain.invoke({"query": state["query"].content})
 
     # Log the raw response
-    logger.info(f"Raw LLM Response (Generation Type Classifier): {response}\n")
+    logger.debug(f"Raw LLM Response (Generation Type Classifier): {response}\n")
     logger.info(
         f"Raw LLM Response Content (Generation Type Classifier): {response.content}\n"
     )

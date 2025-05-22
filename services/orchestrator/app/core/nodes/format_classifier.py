@@ -63,7 +63,7 @@ def format_classifier(state: AgentState) -> AgentState:
     response = chain.invoke({"query": state["query"].content})
 
     # Log the raw response
-    logger.info(f"Raw LLM Response (Format Classifier): {response}\n")
+    logger.debug(f"Raw LLM Response (Format Classifier): {response}\n")
     logger.info(f"Raw LLM Response Content (Format Classifier): {response.content}\n")
 
     # Parse the response content

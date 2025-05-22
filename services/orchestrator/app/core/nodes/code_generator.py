@@ -94,7 +94,7 @@ async def code_generator(state: AgentState) -> AgentState:
         chain = prompt | llm
         code_response = chain.invoke({"input": state["query"].content})
         # Log the raw response
-        logger.info(f"Raw LLM Response: {code_response}")
+        logger.debug(f"Raw LLM Response: {code_response}")
         logger.info(f"Raw LLM Response Content: {code_response.content}")
 
         # Add validation for TypeScript

@@ -14,6 +14,7 @@ settings = get_settings()
 
 def response_generator(state: AgentState) -> AgentState:
     """Generates the final response based on collected information."""
+    logger.info("Generates the final response based on collected information.\n")
     try:
         llm = ChatOpenAI(
             temperature=settings.main_model_temperature,

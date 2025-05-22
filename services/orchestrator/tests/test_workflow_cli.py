@@ -27,7 +27,8 @@ logging.basicConfig(
 )
 
 # Set log level for specific loggers
-logging.getLogger("app.core.workflow").setLevel(logging.DEBUG)
+# logging.getLogger("app.core.workflow").setLevel(logging.DEBUG)
+logging.getLogger("app.core.workflow").setLevel(logging.INFO)
 logging.getLogger("langchain").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 

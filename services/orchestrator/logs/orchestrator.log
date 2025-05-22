@@ -1,0 +1,194 @@
+2025-05-22 14:13:39 - app.core.config - INFO - Loading environment from /Users/davida/workspace/agenthub/.env
+2025-05-22 14:13:39 - app.core.config - INFO - Test log message after configuration update
+2025-05-22 14:14:39 - app.core.config - INFO - Loading environment from /Users/davida/workspace/agenthub/.env
+2025-05-22 14:15:16 - app.core.config - INFO - Loading environment from /Users/davida/workspace/agenthub/.env
+2025-05-22 14:15:16 - __main__ - INFO - Starting AgentHub Workflow CLI Tester
+2025-05-22 14:15:33 - __main__ - INFO - Creating workflow instance
+2025-05-22 14:15:33 - app.core.workflow - INFO - Creating the main agent workflow using LangGraph...
+
+2025-05-22 14:15:33 - __main__ - INFO - Initializing state with message: Hello
+2025-05-22 14:15:33 - app.core.workflow - INFO - Initializing agent state with query: Hello
+2025-05-22 14:15:33 - app.core.workflow - INFO - Successfully initialized agent state
+2025-05-22 14:15:33 - __main__ - INFO - Executing workflow
+2025-05-22 14:15:33 - app.core.nodes.query_classifier - INFO - First level classification: Simple vs Complex...
+
+2025-05-22 14:15:34 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:15:34 - app.core.nodes.query_classifier - INFO - Query type classification result: {'type': 'simple', 'needs_web_search': False, 'needs_document_processing': False}
+2025-05-22 14:15:34 - app.core.nodes.query_classifier - INFO - Query type: <class 'app.core.types.SimpleQuery'>
+2025-05-22 14:15:34 - app.core.nodes.response_generator - INFO - Generates the final response based on collected information.
+
+2025-05-22 14:15:36 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:15:36 - __main__ - INFO - Workflow execution completed
+2025-05-22 14:15:36 - __main__ - INFO - Displaying final response
+2025-05-22 14:16:41 - __main__ - INFO - Creating workflow instance
+2025-05-22 14:16:41 - app.core.workflow - INFO - Creating the main agent workflow using LangGraph...
+
+2025-05-22 14:16:41 - __main__ - INFO - Initializing state with message: Generate hellow world sample in C++
+2025-05-22 14:16:41 - app.core.workflow - INFO - Initializing agent state with query: Generate hellow world sample in C++
+2025-05-22 14:16:41 - app.core.workflow - INFO - Successfully initialized agent state
+2025-05-22 14:16:41 - __main__ - INFO - Executing workflow
+2025-05-22 14:16:41 - app.core.nodes.query_classifier - INFO - First level classification: Simple vs Complex...
+
+2025-05-22 14:16:43 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:16:43 - app.core.nodes.query_classifier - INFO - Query type classification result: {'type': 'complex', 'needs_web_search': False, 'needs_document_processing': False}
+2025-05-22 14:16:43 - app.core.nodes.query_classifier - INFO - Query type: <class 'app.core.types.ComplexQuery'>
+2025-05-22 14:16:43 - app.core.nodes.generator_classifier - INFO - Second level: Classify between Code vs Document generation...
+
+2025-05-22 14:16:44 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:16:44 - app.core.nodes.generator_classifier - INFO - Raw LLM Response Content (Generation Type Classifier): {"generator_type": "code"}
+
+2025-05-22 14:16:44 - app.core.nodes.language_classifier - INFO - Classifying programming language...
+2025-05-22 14:16:45 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:16:45 - app.core.nodes.language_classifier - INFO - Raw LLM Response Content (Language Classifier): {"language": "cpp"}
+
+2025-05-22 14:16:49 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:16:49 - app.core.nodes.code_generator - INFO - Raw LLM Response Content: ```cpp
+/**
+ * @file hello_world.cpp
+ * @brief A simple "Hello, World!" program using modern C++ features.
+ */
+
+#include <iostream>
+#include <memory>
+
+/**
+ * @class Greeter
+ * @brief A class responsible for greeting.
+ */
+class Greeter {
+ public:
+  /**
+   * @brief Prints "Hello, World!" to the standard output.
+   */
+  void SayHello() const {
+    std::cout << "Hello, World!" << std::endl;
+  }
+};
+
+/**
+ * @brief Entry point of the program.
+ * @return int Exit status.
+ */
+int main() {
+  // Use a smart pointer to manage the Greeter instance.
+  auto greeter = std::make_unique<Greeter>();
+  greeter->SayHello();
+  // greeter is automatically destroyed here (RAII)
+  return 0;
+}
+```
+**Notes:**
+- Uses `std::make_unique` for RAII and smart pointer usage.
+- Follows Google C++ style (class names, function names, braces, etc.).
+- Includes Doxygen comments.
+- Uses modern C++ features (smart pointers, `auto`).
+2025-05-22 14:16:49 - app.core.nodes.code_generator - INFO - Code generation completed for CodeLanguage.CPP
+2025-05-22 14:16:49 - app.core.nodes.response_generator - INFO - Generates the final response based on collected information.
+
+2025-05-22 14:17:09 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:17:09 - __main__ - INFO - Workflow execution completed
+2025-05-22 14:17:09 - __main__ - INFO - Generated code content in CodeLanguage.CPP format
+2025-05-22 14:17:09 - __main__ - INFO - Displaying final response
+2025-05-22 14:18:32 - __main__ - INFO - Creating workflow instance
+2025-05-22 14:18:32 - app.core.workflow - INFO - Creating the main agent workflow using LangGraph...
+
+2025-05-22 14:18:32 - __main__ - INFO - Initializing state with message: quit
+2025-05-22 14:18:32 - app.core.workflow - INFO - Initializing agent state with query: quit
+2025-05-22 14:18:32 - app.core.workflow - INFO - Successfully initialized agent state
+2025-05-22 14:18:32 - __main__ - INFO - Executing workflow
+2025-05-22 14:18:32 - app.core.nodes.query_classifier - INFO - First level classification: Simple vs Complex...
+
+2025-05-22 14:18:33 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:18:33 - app.core.nodes.query_classifier - INFO - Query type classification result: {'type': 'simple', 'needs_web_search': False, 'needs_document_processing': False}
+2025-05-22 14:18:33 - app.core.nodes.query_classifier - INFO - Query type: <class 'app.core.types.SimpleQuery'>
+2025-05-22 14:18:33 - app.core.nodes.response_generator - INFO - Generates the final response based on collected information.
+
+2025-05-22 14:18:40 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:18:40 - __main__ - INFO - Workflow execution completed
+2025-05-22 14:18:40 - __main__ - INFO - Displaying final response
+2025-05-22 14:19:17 - __main__ - INFO - Exiting workflow tester
+2025-05-22 14:21:28 - app.core.config - INFO - Loading environment from /Users/davida/workspace/agenthub/.env
+2025-05-22 14:21:29 - __main__ - INFO - Starting AgentHub Workflow CLI Tester
+2025-05-22 14:21:32 - __main__ - INFO - Creating workflow instance
+2025-05-22 14:21:32 - app.core.workflow - INFO - Creating the main agent workflow using LangGraph...
+
+2025-05-22 14:21:32 - __main__ - INFO - Initializing state with message: Hi there
+2025-05-22 14:21:32 - app.core.workflow - INFO - Initializing agent state with query: Hi there
+2025-05-22 14:21:32 - app.core.workflow - INFO - Successfully initialized agent state
+2025-05-22 14:21:32 - __main__ - INFO - Executing workflow
+2025-05-22 14:21:32 - app.core.nodes.query_classifier - INFO - First level classification: Simple vs Complex...
+
+2025-05-22 14:21:34 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:21:34 - app.core.nodes.query_classifier - INFO - Query type classification result: {'type': 'simple', 'needs_web_search': False, 'needs_document_processing': False}
+2025-05-22 14:21:34 - app.core.nodes.query_classifier - INFO - Query type: <class 'app.core.types.SimpleQuery'>
+2025-05-22 14:21:34 - app.core.nodes.response_generator - INFO - Generates the final response based on collected information.
+
+2025-05-22 14:21:36 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:21:36 - __main__ - INFO - Workflow execution completed
+2025-05-22 14:21:36 - __main__ - INFO - Displaying final response
+2025-05-22 14:22:25 - __main__ - INFO - Creating workflow instance
+2025-05-22 14:22:25 - app.core.workflow - INFO - Creating the main agent workflow using LangGraph...
+
+2025-05-22 14:22:25 - __main__ - INFO - Initializing state with message: Generate a poem about David of Sasun
+2025-05-22 14:22:25 - app.core.workflow - INFO - Initializing agent state with query: Generate a poem about David of Sasun
+2025-05-22 14:22:25 - app.core.workflow - INFO - Successfully initialized agent state
+2025-05-22 14:22:25 - __main__ - INFO - Executing workflow
+2025-05-22 14:22:25 - app.core.nodes.query_classifier - INFO - First level classification: Simple vs Complex...
+
+2025-05-22 14:22:26 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:22:26 - app.core.nodes.query_classifier - INFO - Query type classification result: {'type': 'complex', 'needs_web_search': False, 'needs_document_processing': False}
+2025-05-22 14:22:26 - app.core.nodes.query_classifier - INFO - Query type: <class 'app.core.types.ComplexQuery'>
+2025-05-22 14:22:26 - app.core.nodes.generator_classifier - INFO - Second level: Classify between Code vs Document generation...
+
+2025-05-22 14:22:27 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:22:27 - app.core.nodes.generator_classifier - INFO - Raw LLM Response Content (Generation Type Classifier): {"generator_type": "document"}
+
+2025-05-22 14:22:27 - app.core.nodes.format_classifier - INFO - Classifying document format...
+2025-05-22 14:22:29 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:22:29 - app.core.nodes.format_classifier - INFO - Raw LLM Response Content (Format Classifier): {"format": "txt"}
+
+2025-05-22 14:22:40 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:22:40 - app.core.nodes.document_generator - INFO - Raw LLM Response Content: # David of Sasun
+
+## The Hero of the Highlands
+
+Upon the peaks where eagles soar,  
+And rivers carve the ancient stone,  
+A legend walks from days of yore—  
+Young David, Sasun’s very own.
+
+## Born of Thunder, Raised by Fate
+
+From noble roots and stormy skies,  
+He grew with mountains in his eyes.  
+A lion’s heart, a shepherd’s hand,  
+Protector of his native land.
+
+## The Sword of Justice
+
+With steely blade and steadfast will,  
+He faced the tyrant’s wicked skill.  
+Against the odds, he stood alone,  
+For freedom’s cause, for hearth and home.
+
+## Champion of the People
+
+No dragon’s fire nor villain’s scheme  
+Could shake the hope or dim the dream.  
+In every tale the bards relate,  
+He rides for love and not for hate.
+
+## Legacy Eternal
+
+So let the valleys echo true  
+With songs of David, brave and bold.  
+His spirit lives in me and you,  
+A hero’s heart that won’t grow old.
+2025-05-22 14:22:40 - app.core.nodes.document_generator - INFO - Document generation completed for DocumentFormat.TEXT
+2025-05-22 14:22:40 - app.core.nodes.response_generator - INFO - Generates the final response based on collected information.
+
+2025-05-22 14:22:57 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-22 14:22:57 - __main__ - INFO - Workflow execution completed
+2025-05-22 14:22:57 - __main__ - INFO - Generated document content in DocumentFormat.TEXT format
+2025-05-22 14:22:57 - __main__ - INFO - Displaying final response
+2025-05-22 14:25:34 - __main__ - INFO - Exiting workflow tester

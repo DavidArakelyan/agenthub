@@ -47,7 +47,7 @@ def language_classifier(state: AgentState) -> AgentState:
     response = chain.invoke({"query": state["query"].content})
 
     # Log the raw response
-    logger.info(f"Raw LLM Response (Language Classifier): {response}\n")
+    logger.debug(f"Raw LLM Response (Language Classifier): {response}\n")
     logger.info(f"Raw LLM Response Content (Language Classifier): {response.content}\n")
 
     # Parse the response content

@@ -78,7 +78,7 @@ async def document_generator(state: AgentState) -> AgentState:
         chain = prompt | llm
         doc_response = chain.invoke({"input": state["query"].content})
         # Log the raw response
-        logger.info(f"Raw LLM Response: {doc_response}")
+        logger.debug(f"Raw LLM Response: {doc_response}")
         logger.info(f"Raw LLM Response Content: {doc_response.content}")
 
         # Add validation for Markdown

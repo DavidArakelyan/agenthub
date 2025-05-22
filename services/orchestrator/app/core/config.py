@@ -10,9 +10,65 @@ import os
 
 # Configure logging
 import logging
+import sys
+from pathlib import Path
+import os
 
+
+# Create function to set up logging
+def setup_logging():
+    """Set up logging configuration."""
+    # Set up logging directory - use absolute path from workspace root
+    log_dir = Path(__file__).resolve().parents[2] / "logs"  # Changed to correct path
+    try:
+        log_dir.mkdir(exist_ok=True)
+        log_file = log_dir / "orchestrator.log"
+
+        # Ensure we have write permissions and create the file if it doesn't exist
+        if not log_file.exists():
+            log_file.touch(mode=0o644)
+        if not os.access(log_file, os.W_OK):
+            print(f"Warning: No write access to {log_file}")
+            return False
+
+        # Configure formatters
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        # Configure file handler
+        file_handler = logging.FileHandler(log_file, mode="a")
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)
+
+        # Configure stderr handler
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.setFormatter(formatter)
+        stderr_handler.setLevel(logging.INFO)
+
+        # Configure root logger with both handlers
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+        root_logger.addHandler(file_handler)
+        # root_logger.addHandler(stderr_handler)
+
+        return True
+    except Exception as e:
+        print(f"Error setting up logging: {e}")
+        return False
+
+
+# Set up logging
+setup_logging()
+
+# Configure module logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+
+# Set levels for specific modules
+# logging.getLogger("app.core.workflow").setLevel(logging.INFO)
+# logging.getLogger("app.core.nodes").setLevel(logging.INFO)
 
 
 def load_environment() -> None:
