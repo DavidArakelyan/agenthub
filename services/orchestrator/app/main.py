@@ -21,7 +21,7 @@ from app.core.exceptions import (
     WorkflowError,  # noqa: F401
     FileProcessingError,
 )
-from app.core.validators import MessageRequest, validate_file
+from app.core.utils import MessageRequest, validate_file
 from app.core.mcp_client import init_mcp, mcp
 
 app = FastAPI(

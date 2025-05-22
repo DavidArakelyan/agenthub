@@ -8,12 +8,12 @@ import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 
-# from app.core.workflow import create_agent_workflow, initialize_state
+from app.core.workflow import create_agent_workflow, initialize_state
+
 # from app.core.workflow_simple import create_agent_workflow, initialize_state
-from app.core.workflow_v2 import create_agent_workflow, initialize_state
 from app.core.config import get_settings
 from app.core.mcp_client import init_mcp
-from app.core.query import SimpleQuery, ComplexQuery
+from app.core.types import SimpleQuery, ComplexQuery
 import logging
 import sys
 
@@ -47,10 +47,10 @@ async def main():
 
     while True:
         # Get user input
-        print("\nEnter your message (or 'quit' to exit):")
+        print("\nEnter your message (or 'exit' to quit):")
         message = input("> ")
 
-        if message.lower() == "quit":
+        if message.lower() == "exit":
             logger.info("Exiting workflow tester")
             break
 

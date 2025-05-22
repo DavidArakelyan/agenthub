@@ -1,7 +1,7 @@
 """Tests for workflow components."""
 
 import pytest
-from app.core.workflow_v2 import create_agent_workflow, initialize_state, AgentState
+from app.core.workflow import create_agent_workflow, initialize_state, AgentState
 from langchain.schema import HumanMessage
 import logging
 import sys

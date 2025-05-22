@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage  # noqa: F401
 import logging
 import sys
 
-from app.core.workflow_v2 import (
+from app.core.workflow import (
     initialize_state,
     AgentWorkflow,
     GeneratorType,

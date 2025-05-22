@@ -1,9 +1,8 @@
-"""
-Query models and types for the agent workflow.
-"""
+"""Type definitions and query models for the orchestrator service."""
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, List, TypedDict, Union, Optional
+from langchain.schema import BaseMessage
 from pydantic import BaseModel
 
 
@@ -20,6 +19,7 @@ class CodeLanguage(str, Enum):
 
     PYTHON = "py"
     TYPESCRIPT = "ts"
+    JAVASCRIPT = "js"
     CPP = "cpp"
     JAVA = "java"
 
@@ -53,3 +53,13 @@ class ComplexQuery(BaseQuery):
     generator_type: GeneratorType = GeneratorType.NONE
     code_language: Optional[CodeLanguage] = None
     document_format: Optional[DocumentFormat] = None
+
+
+class AgentState(TypedDict):
+    """State definition for the agent workflow."""
+
+    messages: List[BaseMessage]
+    current_step: str
+    task_status: Dict[str, Any]
+    context: Dict[str, Any]
+    query: Union[SimpleQuery, ComplexQuery]
