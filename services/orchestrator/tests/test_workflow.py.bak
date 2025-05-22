@@ -6,6 +6,19 @@ from langchain.schema import HumanMessage
 import logging
 import sys
 
+# Configure pytest-asyncio
+pytest.register_assert_rewrite('pytest_asyncio')r workflow components."""
+
+import pytest
+from app.core.workflow import create_agent_workflow, initialize_state
+from langchain.schema import HumanMessage
+import logging
+import sys
+
+# Configure pytest-asyncio
+pytest.register_assert_rewrite("pytest_asyncio")
+pytestmark = pytest.mark.asyncio
+
 # Configure logging to show all logs
 logging.basicConfig(
     level=logging.INFO,
@@ -62,11 +75,7 @@ async def test_query_classification(
 
     # Run the workflow
     result = await workflow.ainvoke(state)
-
-    # Debug output
-    print("\nWorkflow result:", result)
-    print("\nTask status:", result.get("task_status", {}))
-
+    
     # The result should be in task_status
     assert result["task_status"]["type"] == expected_type
     assert result["task_status"]["generation_type"] == expected_gen
