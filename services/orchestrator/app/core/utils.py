@@ -3,11 +3,13 @@
 import re
 from typing import List, Optional
 from fastapi import UploadFile
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class MessageRequest(BaseModel):
     """Validation model for chat message requests."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     chat_id: str = Field(..., min_length=1, description="Chat session ID")
     message: str = Field(
@@ -15,13 +17,15 @@ class MessageRequest(BaseModel):
     )
     files: Optional[List[str]] = Field(default=None, description="List of file names")
 
-    @validator("chat_id")
+    @field_validator("chat_id")
+    @classmethod
     def validate_chat_id(cls, v):
         if not re.match(r"^[a-f0-9-]+$", v):
             raise ValueError("Invalid chat ID format")
         return v
 
-    @validator("message")
+    @field_validator("message")
+    @classmethod
     def validate_message(cls, v):
         if not v.strip():
             raise ValueError("Message cannot be empty")

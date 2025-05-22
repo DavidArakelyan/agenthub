@@ -5,14 +5,8 @@ from langchain_core.messages import HumanMessage, SystemMessage  # noqa: F401
 import logging
 import sys
 
-from app.core.workflow import (
-    initialize_state,
-    AgentWorkflow,
-    GeneratorType,
-    CodeLanguage,
-    ComplexQuery,
-    DocumentFormat,
-)
+from app.core.workflow import initialize_state, AgentWorkflow
+from app.core.types import GeneratorType, CodeLanguage, ComplexQuery, DocumentFormat
 
 # Configure logging to show all logs
 logging.basicConfig(
