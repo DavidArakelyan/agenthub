@@ -1,7 +1,7 @@
 """Tests for workflow components."""
 
 import pytest
-from app.core.workflow import create_agent_workflow, initialize_state
+from app.core.workflow import create_agent_workflow, initialize_state, AgentState
 from langchain.schema import HumanMessage
 import logging
 import sys
@@ -25,17 +25,14 @@ def test_initialize_state():
     query = "Generate a Python function to sort a list"
     state = initialize_state(query)
 
-    # We can't use isinstance with TypedDict, so we check the dict structure instead
-    assert "messages" in state
-    assert "current_step" in state
-    assert "task_status" in state
-    assert "context" in state
-    assert "query" in state
-
+    assert isinstance(state, AgentState)
     assert len(state["messages"]) == 1
     assert isinstance(state["messages"][0], HumanMessage)
     assert state["messages"][0].content == query
     assert state["current_step"] == "start"
+    assert state["query_type"] == "simple"
+    assert state["generation_type"] == "none"
+    assert state["target_format"] == "none"
 
 
 def test_create_workflow():
@@ -52,7 +49,6 @@ def test_create_workflow():
         ("What is the capital of France?", "simple", "none", "none"),
     ],
 )
-@pytest.mark.asyncio
 async def test_query_classification(
     query, expected_type, expected_gen, expected_format
 ):
@@ -63,14 +59,9 @@ async def test_query_classification(
     # Run the workflow
     result = await workflow.ainvoke(state)
 
-    # Debug output
-    print("\nWorkflow result:", result)
-    print("\nTask status:", result.get("task_status", {}))
-
-    # The result should be in task_status
-    assert result["task_status"]["type"] == expected_type
-    assert result["task_status"]["generation_type"] == expected_gen
-    assert result["task_status"]["format"] == expected_format
+    assert result["query_type"] == expected_type
+    assert result["generation_type"] == expected_gen
+    assert result["target_format"] == expected_format
 
 
 @pytest.mark.parametrize(
@@ -80,7 +71,6 @@ async def test_query_classification(
         ("What is 2+2?", False),
     ],
 )
-@pytest.mark.asyncio
 async def test_web_search_condition(query, should_search):
     """Test web search conditional execution."""
     workflow = create_agent_workflow()

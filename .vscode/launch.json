@@ -19,7 +19,28 @@
                 "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
             },
             "justMyCode": false,
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "subProcess": true
+        },
+        {
+            "name": "Python: FastAPI (No Reload)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "app.main:app",
+                "--port",
+                "8000"
+            ],
+            "cwd": "${workspaceFolder}/services/orchestrator",
+            "python": "${workspaceFolder}/services/orchestrator/.venv_orchestrator/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/services/orchestrator",
+                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
+            },
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal"
         }
     ],
     "compounds": [

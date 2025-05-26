@@ -12,6 +12,31 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def sync_code_generator(state: AgentState) -> AgentState:
+    """
+    Synchronous wrapper for code generation.
+    """
+    import asyncio
+
+    try:
+        # Try to get the existing loop
+        loop = asyncio.get_event_loop()
+        should_close_loop = False
+    except RuntimeError:
+        # Create a new loop if none exists
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        should_close_loop = True
+
+    try:
+        # Run the async code generator
+        return loop.run_until_complete(code_generator(state))
+    finally:
+        # Only close the loop if we created it
+        if should_close_loop:
+            loop.close()
+
+
 async def code_generator(state: AgentState) -> AgentState:
     """Generates code in the specified programming language."""
     try:

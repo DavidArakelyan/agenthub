@@ -11,8 +11,15 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 import json
+import sys
 
-from app.core.workflow import create_agent_workflow, initialize_state
+from app.core.workflow import (
+    create_agent_workflow,
+    initialize_state,
+    run_workflow,
+    run_workflow_async,
+)
+
 from app.core.config import settings
 from app.core.exceptions import (
     AgentHubException,
@@ -23,6 +30,22 @@ from app.core.exceptions import (
 )
 from app.core.utils import MessageRequest, validate_file
 from app.core.mcp_client import init_mcp, mcp
+
+
+# Debugging helper function
+def debug_break():
+    """
+    Call this function anywhere you want to create a reliable breakpoint
+    that will work with VS Code debugging. This function will be ignored
+    in production but will stop execution in debug mode.
+    """
+    # This will be caught by VS Code's debugger when running with F5
+    # and ignored otherwise
+    frame = sys._getframe().f_back
+    print(f"DEBUG BREAK at {frame.f_code.co_filename}:{frame.f_lineno}")
+    # This is intentionally left here as a marker for the debugger
+    a = 1  # VS Code will stop here when debugging
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -168,6 +191,9 @@ async def send_message(
 ):
     """Send a message to the chat."""
     try:
+        # Use the debug_break function to add a breakpoint here
+        debug_break()
+
         # Validate request
         request_data = MessageRequest(chat_id=chat_id, message=message)  # noqa: F841
 
@@ -200,7 +226,7 @@ async def send_message(
                 ]  # Use first file for now
 
             # Execute workflow
-            final_state = workflow.invoke(state)
+            final_state = await run_workflow_async(state)
 
             # Extract canvas content if any was generated
             canvas_content = final_state["context"].get("canvas_content")
@@ -439,3 +465,34 @@ async def save_content(request: SaveContentRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving content: {str(e)}")
+
+
+@app.get("/chat/list")
+async def list_all_chats():
+    """List all available chat sessions."""
+    try:
+        # Collect all chat sessions with basic info
+        chat_list = [
+            {
+                "id": chat_id,
+                "name": chat_info.get("name", "Untitled Chat"),
+                "created_at": chat_info.get("created_at", ""),
+                "updated_at": chat_info.get("updated_at", ""),
+                "message_count": len(chat_info.get("messages", [])),
+            }
+            for chat_id, chat_info in chats.items()
+        ]
+
+        # Sort by updated_at in descending order (newest first)
+        chat_list.sort(key=lambda x: x["updated_at"], reverse=True)
+
+        return {"success": True, "data": chat_list}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "Failed to list chats",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }

@@ -2,24 +2,23 @@
 Core workflow implementation using LangGraph for agent orchestration.
 """
 
-from typing import Any, Dict, List, Union
+from typing import Dict
 from langgraph.graph import Graph, StateGraph
-from langchain.schema import BaseMessage
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 import logging
 
 from app.core.config import get_settings
 from app.core.types import SimpleQuery, ComplexQuery, GeneratorType
 from app.core.types import AgentState
+from app.core.nodes.web_searcher import web_searcher
+from app.core.nodes.document_processor import document_processor
+from app.core.nodes.code_generator import code_generator
+from app.core.nodes.document_generator import document_generator
 from app.core.nodes import (
     query_type_classifier,
     generator_type_classifier,
     language_classifier,
     format_classifier,
-    web_searcher,
-    document_processor,
-    code_generator,
-    document_generator,
     response_generator,
 )
 
@@ -47,6 +46,24 @@ class AgentWorkflow:
             return result
         except Exception as e:
             logger.error(f"Error in workflow execution: {str(e)}")
+            return {
+                "context": {
+                    "code_generation_completed": False,
+                    "document_generation_completed": False,
+                    "error": str(e),
+                }
+            }
+
+    def invoke(self, state):
+        """Synchronous wrapper for ainvoke."""
+        try:
+            logger.info(f"Processing state synchronously: {state}")
+            # Execute the workflow synchronously
+            result = self.workflow.invoke(state)
+            logger.info(f"Synchronous workflow completed with result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in synchronous workflow execution: {str(e)}")
             return {
                 "context": {
                     "code_generation_completed": False,
@@ -129,4 +146,47 @@ def initialize_state(query: str) -> AgentState:
         return state
     except Exception as e:
         logger.error(f"Error initializing agent state: {str(e)}")
+        raise
+
+
+async def run_workflow_async(state: AgentState) -> Dict:
+    """Run the workflow asynchronously."""
+    try:
+        logger.info("Running workflow asynchronously...")
+        workflow = AgentWorkflow()
+        result = await workflow.ainvoke(state)
+        return result
+    except Exception as e:
+        logger.error(f"Error running workflow asynchronously: {str(e)}")
+        raise
+
+
+def run_workflow(state: AgentState) -> Dict:
+    """Run the workflow synchronously by wrapping the async implementation."""
+    import asyncio
+
+    try:
+        logger.info("Running workflow synchronously (via async wrapper)...")
+
+        # Get-or-Create Pattern for event loop
+        try:
+            loop = asyncio.get_event_loop()
+            should_close_loop = False
+        except RuntimeError:
+            # Create a new loop if none exists
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            should_close_loop = True
+
+        try:
+            # Run the async workflow function
+            result = loop.run_until_complete(run_workflow_async(state))
+            return result
+        finally:
+            # Only close the loop if we created it
+            if should_close_loop:
+                loop.close()
+
+    except Exception as e:
+        logger.error(f"Error running workflow synchronously: {str(e)}")
         raise
