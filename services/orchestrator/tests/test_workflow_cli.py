@@ -99,12 +99,27 @@ async def main():
             # Show generated content if any
             if final_state["context"].get("canvas_content"):
                 content = final_state["context"]["canvas_content"]
+                target_format = final_state["context"].get("target_format", "unknown")
+
+                # Determine content type based on task status
+                content_type = "unknown"
+                if final_state["task_status"].get("code_generated", False):
+                    content_type = "code"
+                elif final_state["task_status"].get("document_generated", False):
+                    content_type = "document"
+
                 logger.info(
-                    f"Generated {content['type']} content in {content['format']} format"
+                    f"Generated {content_type} content in {target_format} format"
                 )
-                print(f"\nGenerated {content['type']} content ({content['format']}):")
+                print(f"\nGenerated {content_type} content ({target_format}):")
                 print("-" * 40)
-                print(content["content"])
+
+                # Handle both string and dictionary content for backward compatibility
+                if isinstance(content, dict) and "content" in content:
+                    print(content["content"])
+                else:
+                    print(content)
+
                 print("-" * 40)
 
             # Show final response

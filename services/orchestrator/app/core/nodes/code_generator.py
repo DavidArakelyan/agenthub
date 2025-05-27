@@ -148,7 +148,40 @@ async def code_generator(state: AgentState) -> AgentState:
                 code_response = chain.invoke({"code": code_response.content})
 
         # Update state with generated code
-        state["context"]["generated_code"] = code_response.content
+        raw_response = code_response.content
+
+        # Try to extract pure code if it's in a code block format
+        pure_code = raw_response
+        code_explanation = ""
+
+        # If the response contains markdown code blocks, extract just the code
+        if "```" in raw_response:
+            code_blocks = raw_response.split("```")
+
+            # Check if we have at least one complete code block
+            if len(code_blocks) >= 3:
+                # The text before the first code block is the explanation
+                code_explanation = code_blocks[0].strip()
+
+                # Get the code block - skip language identifier if present
+                code_block = code_blocks[1]
+                lines = code_block.split("\n", 1)
+                if len(lines) > 1:
+                    # Skip the language identifier line
+                    pure_code = lines[1].strip()
+                else:
+                    pure_code = lines[0].strip()
+
+                # If there's more explanation after the code block, add it
+                if len(code_blocks) > 3:
+                    additional_explanation = "\n\n".join(code_blocks[2:-1]).strip()
+                    if additional_explanation:
+                        code_explanation += "\n\n" + additional_explanation
+
+        # Store both the raw response and the extracted pure code
+        state["context"]["generated_code_raw"] = raw_response
+        state["context"]["generated_code"] = pure_code
+        state["context"]["code_explanation"] = code_explanation
         state["context"]["code_generation_completed"] = True
         logger.info(f"Code generation completed for {state['query'].code_language}")
     except Exception as e:

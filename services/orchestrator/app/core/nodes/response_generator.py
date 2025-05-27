@@ -81,17 +81,40 @@ def response_generator(state: AgentState) -> AgentState:
         # Prepare generated content for canvas if any
         if isinstance(state["query"], ComplexQuery):
             if state["query"].generator_type == GeneratorType.CODE:
-                state["context"]["canvas_content"] = {
-                    "type": "code",
-                    "format": state["query"].code_language,
-                    "content": state["context"].get("generated_code", ""),
-                }
+                # Store only the pure generated code without explanatory content
+                state["context"]["canvas_content"] = state["context"].get(
+                    "generated_code", ""
+                )
+
+                # Store the target format for file extension determination
+                state["context"]["target_format"] = (
+                    state["query"].code_language.value
+                    if state["query"].code_language
+                    else None
+                )
+
+                # Include any code explanation in the context for the response
+                code_explanation = state["context"].get("code_explanation", "")
+                if code_explanation:
+                    state["context"]["explanation"] = code_explanation
+
             elif state["query"].generator_type == GeneratorType.DOCUMENT:
-                state["context"]["canvas_content"] = {
-                    "type": "document",
-                    "format": state["query"].document_format,
-                    "content": state["context"].get("generated_document", ""),
-                }
+                # Store only the pure generated document without explanatory content
+                state["context"]["canvas_content"] = state["context"].get(
+                    "generated_document", ""
+                )
+
+                # Store the target format for file extension determination
+                state["context"]["target_format"] = (
+                    state["query"].document_format.value
+                    if state["query"].document_format
+                    else None
+                )
+
+                # Include any document explanation in the context for the response
+                document_explanation = state["context"].get("document_explanation", "")
+                if document_explanation:
+                    state["context"]["explanation"] = document_explanation
 
         chain = prompt | llm
         # Always pass both query and context

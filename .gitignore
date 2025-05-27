@@ -58,4 +58,8 @@ services/frontend/node_modules/*
 *.egg-info/
 *.egg
 dist/
-build/ 
+build/
+
+# Generated Content
+/generated_content
+/logs 

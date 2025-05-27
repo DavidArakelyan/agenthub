@@ -131,7 +131,35 @@ async def document_generator(state: AgentState) -> AgentState:
                 chain = prompt | llm
                 doc_response = chain.invoke({"doc": doc_response.content})
 
-        state["context"]["generated_document"] = doc_response.content
+        # Store both the raw response and ensure we have pure content
+        raw_response = doc_response.content
+        pure_document = raw_response
+        document_explanation = ""
+
+        # For markdown with code blocks, make sure we extract only the document
+        # Unlike code generator, we keep all content but separate explanations
+        if (
+            "```" in raw_response
+            and state["query"].document_format == DocumentFormat.MARKDOWN
+        ):
+            # For documents we want to preserve code blocks, but identify preamble
+            parts = raw_response.split("\n")
+            # Check if there's a preamble explanation before the actual document
+            if (
+                parts
+                and not parts[0].startswith("#")
+                and not parts[0].startswith("```")
+            ):
+                # Find where the actual document starts (first heading or code block)
+                for i, line in enumerate(parts):
+                    if line.startswith("#") or line.startswith("```"):
+                        document_explanation = "\n".join(parts[:i]).strip()
+                        pure_document = "\n".join(parts[i:]).strip()
+                        break
+
+        state["context"]["generated_document_raw"] = raw_response
+        state["context"]["generated_document"] = pure_document
+        state["context"]["document_explanation"] = document_explanation
         state["context"]["document_generation_completed"] = True
         logger.info(
             f"Document generation completed for {state['query'].document_format}"

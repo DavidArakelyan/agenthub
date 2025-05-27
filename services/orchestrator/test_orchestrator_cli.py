@@ -111,7 +111,16 @@ class OrchestratorClient:
             data = response.json()
             if data.get("success", False):
                 print_success(f"Message sent successfully (took {elapsed:.2f}s)")
-                return data["data"]
+
+                # Extract and save generated content if available
+                response_data = data["data"]
+                if (
+                    "canvas_content" in response_data
+                    and response_data["canvas_content"]
+                ):
+                    self._save_generated_content(message, response_data)
+
+                return response_data
             else:
                 print_error(
                     f"Failed to send message: {data.get('error', {}).get('message', 'Unknown error')}"
@@ -120,6 +129,269 @@ class OrchestratorClient:
         else:
             print_error(f"HTTP Error: {response.status_code} - {response.text}")
             return None
+
+    def _save_generated_content(
+        self, query: str, response_data: Dict[str, Any]
+    ) -> Optional[str]:
+        """Save generated content to appropriate file based on content type and target format"""
+        # Get canvas content
+        canvas_content = response_data.get("canvas_content")
+        if not canvas_content:
+            return None
+
+        # Try to determine the content type and appropriate file extension
+        content_type = None
+        file_ext = None
+
+        # Look for task status information
+        task_status = response_data.get("task_status", {})
+
+        # First check if target_format is provided - this is the most reliable source
+        if "target_format" in response_data and response_data["target_format"] not in [
+            None,
+            "none",
+        ]:
+            target_format = response_data["target_format"]
+
+            # Map target_format to file extension
+            format_to_ext = {
+                # Programming languages
+                "py": "py",
+                "python": "py",
+                "js": "js",
+                "javascript": "js",
+                "ts": "ts",
+                "typescript": "ts",
+                "java": "java",
+                "cpp": "cpp",
+                "c++": "cpp",
+                "cs": "cs",
+                "c#": "cs",
+                "csharp": "cs",
+                "rb": "rb",
+                "ruby": "rb",
+                "go": "go",
+                "rust": "rs",
+                "rs": "rs",
+                "swift": "swift",
+                "kt": "kt",
+                "kotlin": "kt",
+                "php": "php",
+                # Document formats
+                "md": "md",
+                "markdown": "md",
+                "html": "html",
+                "txt": "txt",
+                "text": "txt",
+                "json": "json",
+                "yaml": "yml",
+                "yml": "yml",
+                "xml": "xml",
+                "csv": "csv",
+                "doc": "md",  # Default to markdown for documents
+                "docx": "md",
+                "pdf": "md",
+                # Shell scripts
+                "sh": "sh",
+                "bash": "sh",
+                "shell": "sh",
+                # Web formats
+                "css": "css",
+                "sql": "sql",
+            }
+
+            if target_format.lower() in format_to_ext:
+                file_ext = format_to_ext[target_format.lower()]
+
+                # Also determine content type based on target format
+                if file_ext in ["md", "txt", "html", "doc", "docx", "pdf"]:
+                    content_type = "document"
+                else:
+                    content_type = "code"
+
+        # If we couldn't determine from target_format, use task_status
+        if not file_ext or not content_type:
+            # Check if this is code generation
+            if task_status.get("code_generated", False):
+                content_type = "code"
+
+                # Try to extract language from code block if we don't have file_ext yet
+                if not file_ext and "```" in canvas_content:
+                    code_blocks = canvas_content.split("```")
+                    if len(code_blocks) >= 2:
+                        lang_hint = code_blocks[1].split("\n")[0].strip().lower()
+                        if lang_hint:
+                            if lang_hint in ["python", "py"]:
+                                file_ext = "py"
+                            elif lang_hint in ["javascript", "js"]:
+                                file_ext = "js"
+                            elif lang_hint in ["typescript", "ts"]:
+                                file_ext = "ts"
+                            elif lang_hint in ["java"]:
+                                file_ext = "java"
+                            elif lang_hint in ["c++", "cpp", "c"]:
+                                file_ext = "cpp"
+                            elif lang_hint in ["c#", "csharp"]:
+                                file_ext = "cs"
+                            elif lang_hint in ["ruby", "rb"]:
+                                file_ext = "rb"
+                            elif lang_hint in ["go"]:
+                                file_ext = "go"
+                            elif lang_hint in ["php"]:
+                                file_ext = "php"
+                            elif lang_hint in ["rust", "rs"]:
+                                file_ext = "rs"
+                            elif lang_hint in ["swift"]:
+                                file_ext = "swift"
+                            elif lang_hint in ["kotlin", "kt"]:
+                                file_ext = "kt"
+                            elif lang_hint in ["bash", "sh"]:
+                                file_ext = "sh"
+                            elif lang_hint in ["sql"]:
+                                file_ext = "sql"
+                            elif lang_hint in ["html"]:
+                                file_ext = "html"
+                            elif lang_hint in ["css"]:
+                                file_ext = "css"
+                            elif lang_hint in ["json"]:
+                                file_ext = "json"
+                            elif lang_hint in ["yaml", "yml"]:
+                                file_ext = "yml"
+                            elif lang_hint in ["xml"]:
+                                file_ext = "xml"
+
+                # Default to .txt if we couldn't determine language
+                if not file_ext:
+                    file_ext = "txt"
+
+            # Check if this is document generation
+            elif task_status.get("document_generated", False):
+                content_type = "document"
+                # Default to markdown for documents
+                file_ext = "md"
+
+                # Check for specific document types
+                if (
+                    canvas_content.startswith("<!DOCTYPE html>")
+                    or "<html" in canvas_content.lower()
+                ):
+                    file_ext = "html"
+                elif canvas_content.startswith("{") and canvas_content.endswith("}"):
+                    file_ext = "json"
+
+            else:
+                # Default to markdown for general responses
+                content_type = "text"
+                file_ext = "md"
+
+        # Generate a filename based on the query and content type
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        query_slug = "_".join(query.split()[:5]).lower()
+        query_slug = "".join(c if c.isalnum() or c == "_" else "" for c in query_slug)
+
+        filename = f"{timestamp}_{content_type}_{query_slug}.{file_ext}"
+
+        # Create output directory if it doesn't exist
+        output_dir = Path("./generated_content")
+        output_dir.mkdir(exist_ok=True)
+
+        # Save the content
+        output_path = output_dir / filename
+
+        # Extract actual content if it's in a code block
+        if (
+            content_type == "code"
+            and isinstance(canvas_content, str)
+            and "```" in canvas_content
+        ):
+            # Extract code from between backticks
+            code_blocks = canvas_content.split("```")
+            if len(code_blocks) >= 3:
+                # Skip the language identifier line if present
+                code_content = code_blocks[1].split("\n", 1)
+                if len(code_content) > 1:
+                    canvas_content = code_content[1]
+                else:
+                    canvas_content = code_content[0]
+
+        # Handle canvas_content based on type
+        if isinstance(canvas_content, dict):
+            # For backward compatibility - extract content from the old format
+            actual_content = None
+
+            # Check for code in common JSON structures
+            if "content" in canvas_content:
+                actual_content = canvas_content["content"]
+            elif "code" in canvas_content:
+                actual_content = canvas_content["code"]
+            elif "source" in canvas_content:
+                actual_content = canvas_content["source"]
+
+            # If we found actual content in the JSON, use that
+            if actual_content:
+                canvas_content = actual_content
+            else:
+                # Fallback: convert the entire dict to JSON if we couldn't extract specific content
+                import json
+
+                canvas_content = json.dumps(canvas_content, indent=2)
+
+        # Ensure canvas_content is pure content only (no introductions or explanations)
+        # Additional cleanup for markdown-formatted code
+        if content_type == "code" and isinstance(canvas_content, str):
+            # Remove common explanatory prefixes
+            prefixes_to_remove = [
+                "Here's ",
+                "Here is ",
+                "Sure! ",
+                "Certainly! ",
+                "Below is ",
+                "I've created ",
+                "I have created ",
+                "This is ",
+            ]
+
+            lines = canvas_content.strip().split("\n")
+            if lines and any(
+                lines[0].startswith(prefix) for prefix in prefixes_to_remove
+            ):
+                # Find the first line that looks like actual code
+                for i, line in enumerate(lines):
+                    # Skip empty lines and explanatory text
+                    if line and not any(
+                        line.startswith(prefix) for prefix in prefixes_to_remove
+                    ):
+                        canvas_content = "\n".join(lines[i:])
+                        break
+
+        # Basic validation of C++ content
+        if (
+            content_type == "code"
+            and file_ext in ["md", "txt"]
+            and isinstance(canvas_content, str)
+        ):
+            # Additional code type detection based on content
+            if "#include" in canvas_content and (
+                "int main" in canvas_content or "void main" in canvas_content
+            ):
+                if "class" in canvas_content and "public:" in canvas_content:
+                    file_ext = "cpp"  # C++ code
+                elif "struct" in canvas_content or "typedef" in canvas_content:
+                    file_ext = "cpp"  # C/C++ code
+                else:
+                    file_ext = "c"  # C code
+
+                # Update the filename to use the correct extension
+                base_name = os.path.splitext(output_path)[0]
+                output_path = Path(f"{base_name}.{file_ext}")
+                print_info(f"Detected C/C++ code, updating extension to {file_ext}")
+
+        # Write the content to the file
+        with open(output_path, "w") as f:
+            f.write(canvas_content)
+
+        print_success(f"Content saved to: {output_path}")
+        return str(output_path)
 
     def get_chat_history(self, chat_id: str) -> List[Dict[str, Any]]:
         """Get the chat history"""

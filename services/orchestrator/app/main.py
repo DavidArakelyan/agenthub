@@ -231,6 +231,23 @@ async def send_message(
             # Extract canvas content if any was generated
             canvas_content = final_state["context"].get("canvas_content")
 
+            # Get target format if available
+            target_format = None
+            if "context" in final_state and "target_format" in final_state["context"]:
+                target_format = final_state["context"]["target_format"]
+            elif (
+                "query" in final_state
+                and hasattr(final_state["query"], "code_language")
+                and final_state["query"].code_language
+            ):
+                target_format = final_state["query"].code_language.value
+            elif (
+                "query" in final_state
+                and hasattr(final_state["query"], "document_format")
+                and final_state["query"].document_format
+            ):
+                target_format = final_state["query"].document_format.value
+
             # Get the last message (response from assistant)
             response_message = final_state["messages"][-1].content
 
@@ -262,6 +279,7 @@ async def send_message(
                     "message": response_message,
                     "canvas_content": canvas_content,
                     "task_status": final_state["task_status"],
+                    "target_format": target_format,
                 },
             }
 
