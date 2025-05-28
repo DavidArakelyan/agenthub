@@ -1,6 +1,12 @@
-import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
+import React, { useState, KeyboardEvent, useRef, useEffect, useCallback } from 'react';
 import { apiClient, ChatMessage, ApiClient } from './services/api';
 import Prism from 'prismjs';
+// Markdown support
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+// FontAwesome imports
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFileCode, faFileAlt, faFile, faCopy, faExpand, faCompress } from '@fortawesome/free-solid-svg-icons';
 // Core prismjs styles
 import 'prismjs/themes/prism-tomorrow.css';
 // Core prism
@@ -16,7 +22,25 @@ import 'prismjs/components/prism-c';
 import 'prismjs/components/prism-cpp';
 import 'prismjs/components/prism-markup';
 import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-sql';
+import 'prismjs/components/prism-yaml';
+// Additional languages
+import 'prismjs/components/prism-csharp';
+import 'prismjs/components/prism-ruby';
+import 'prismjs/components/prism-go';
+import 'prismjs/components/prism-rust';
+import 'prismjs/components/prism-swift';
+import 'prismjs/components/prism-php';
+import 'prismjs/components/prism-kotlin';
+import 'prismjs/components/prism-scala';
+import 'prismjs/components/prism-ini';
+import 'prismjs/components/prism-powershell';
 import './App.css';
+import './language-styles.css'; // Import additional language styling
+import './code-styling.css'; // Import code-specific styling improvements
 
 interface AttachedFile {
     file: File;
@@ -32,12 +56,103 @@ interface Chat {
 }
 
 interface GeneratedContent {
-    type: string;
+    type: 'Code' | 'Document' | string;
     format: string;
     content: string;
 }
 
 const apiClientInstance = new ApiClient();
+
+// Helper function to map content format to Prism language class
+const getLanguageClass = (format: string | undefined, type: string | undefined): string => {
+    if (!format) return 'text';
+
+    // Normalize format to lowercase
+    const formatLower = format.toLowerCase();
+
+    // Special case for Python - make sure it's properly recognized
+    if (formatLower === 'py' || formatLower === 'python') {
+        return 'python';
+    }
+
+    // Map based on format
+    const formatMap: Record<string, string> = {
+        // Programming languages
+        'py': 'python',
+        'python': 'python',  // Explicitly add both py and python
+        'ts': 'typescript',
+        'js': 'javascript',
+        'java': 'java',
+        'cpp': 'cpp',
+        'c': 'c',
+        'cs': 'csharp',
+        'rb': 'ruby',
+        'go': 'go',
+        'rs': 'rust',
+        'swift': 'swift',
+        'php': 'php',
+        'kt': 'kotlin',
+        'scala': 'scala',
+
+        // Markup & configuration
+        'md': 'markdown',
+        'html': 'markup',
+        'xml': 'markup',
+        'css': 'css',
+        'json': 'json',
+        'yaml': 'yaml',
+        'yml': 'yaml',
+        'toml': 'toml',
+        'ini': 'ini',
+
+        // Shell scripts
+        'sh': 'bash',
+        'bash': 'bash',
+        'zsh': 'bash',
+        'ps1': 'powershell',
+
+        // Data formats
+        'sql': 'sql',
+        'txt': 'text',
+        'csv': 'text',
+        'tsv': 'text',
+
+        // Document formats 
+        'doc': 'text',
+        'pdf': 'text',
+    };
+
+    // If we have a type, use it to refine our language class decision
+    if (type && type.toLowerCase() === 'code') {
+        // If it's explicitly code but format isn't in our map, default to a generic code highlighting
+        if (!formatMap[formatLower]) {
+            return 'clike';
+        }
+    } else if (type && type.toLowerCase() === 'document') {
+        // For documents without a specific format or with doc/pdf format, prefer markdown
+        if (!format || formatLower === 'doc' || formatLower === 'pdf') {
+            return 'markdown';
+        }
+    }
+
+    // Return the mapped language or the original format as fallback
+    return formatMap[formatLower] || formatLower;
+};
+
+// Helper function to get an appropriate icon for a content type
+const getContentTypeIcon = (type: string | undefined) => {
+    if (!type) return faFileCode;
+
+    const typeLower = type.toLowerCase();
+    switch (typeLower) {
+        case 'code':
+            return faFileCode;
+        case 'document':
+            return faFileAlt;
+        default:
+            return faFile;
+    }
+};
 
 function App() {
     const [chats, setChats] = useState<Chat[]>([]);
@@ -50,11 +165,20 @@ function App() {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [serverSaveEnabled, setServerSaveEnabled] = useState<{ [key: number]: boolean }>({});
+    const [canvasWidth, setCanvasWidth] = useState<number>(400); // Default width
+    const [isResizing, setIsResizing] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load chats from localStorage on initial render
     useEffect(() => {
+        // Load canvas width from localStorage
+        const savedWidth = localStorage.getItem('canvasWidth');
+        if (savedWidth) {
+            setCanvasWidth(parseInt(savedWidth));
+        }
+
+        // Load saved chats
         const savedChats = localStorage.getItem('chats');
         if (savedChats) {
             const parsedChats = JSON.parse(savedChats).map((chat: any) => ({
@@ -91,6 +215,11 @@ function App() {
 
     useEffect(() => {
         scrollToBottom();
+
+        // Trigger syntax highlighting for code blocks in messages
+        if (messages.length > 0) {
+            triggerSyntaxHighlighting();
+        }
     }, [messages]);
 
     const generateChatName = (firstMessage: string) => {
@@ -191,6 +320,8 @@ function App() {
                 attachedFiles.map(f => f.file)
             );
 
+            // Response is now normalized in the API client to the ChatResponse type
+
             // Add response to messages
             const responseMessage: ChatMessage = {
                 id: Math.random().toString(36).substr(2, 9),
@@ -204,17 +335,54 @@ function App() {
 
             // Update canvas if there's generated content
             if (response.canvas_content) {
+                // Determine content type based on available information
+                let contentType = 'Code'; // Default type
+                let format = response.target_format || 'text';
+
+                // Check if we can infer type from format
+                if (response.target_format) {
+                    const documentFormats = ['md', 'txt', 'doc', 'pdf'];
+                    const codeFormats = ['py', 'js', 'ts', 'java', 'cpp', 'c', 'cs', 'rb', 'go', 'rs', 'swift', 'php'];
+
+                    const formatLower = response.target_format.toLowerCase();
+                    if (documentFormats.includes(formatLower)) {
+                        contentType = 'Document';
+                    } else if (codeFormats.includes(formatLower)) {
+                        contentType = 'Code';
+                    }
+                } else {
+                    // Try to detect Python code if no format is specified
+                    if (detectPythonCode(response.canvas_content)) {
+                        format = 'py';
+                        contentType = 'Code';
+                        console.log('Auto-detected Python code');
+                    }
+                }
+
                 // Create a GeneratedContent object from the raw content
                 const normalizedContent: GeneratedContent = {
-                    // Based on the backend's GeneratorType enum: 'code', 'document', or 'none'
-                    // For now using 'Content' as a default since we don't get the type from the API
-                    type: 'Code',
-                    // Use target_format if available, otherwise default to 'text'
-                    format: response.target_format || 'text',
+                    // Set the content type (Code or Document)
+                    type: contentType,
+                    // Use target_format if available, otherwise default to 'text' or detected format
+                    format: format,
                     // The canvas_content is the actual raw content string
                     content: response.canvas_content
                 };
+
+                // Further processing on the content to try to detect language type if not specified
+                if (normalizedContent.format === 'text' && normalizedContent.type === 'Code') {
+                    // Try to auto-detect common programming languages
+                    const detectedLanguage = detectLanguage(normalizedContent.content);
+                    if (detectedLanguage) {
+                        normalizedContent.format = detectedLanguage;
+                        console.log(`Setting format to ${detectedLanguage} based on content analysis`);
+                    }
+                }
+
                 setCanvas([...canvas, normalizedContent]);
+
+                // Ensure syntax highlighting is applied
+                setTimeout(() => triggerSyntaxHighlighting(), 100);
             }
 
             // Update chat in state
@@ -365,8 +533,161 @@ function App() {
 
     // Initialize Prism highlighting after content updates
     useEffect(() => {
-        Prism.highlightAll();
+        // Force Prism to re-highlight everything when canvas changes
+        if (canvas.length > 0) {
+            // Give the DOM a chance to update before highlighting
+            setTimeout(() => {
+                try {
+                    console.log('Highlighting code with Prism.js');
+                    Prism.highlightAll();
+                    // Apply manual Python highlighting after Prism
+                    setTimeout(() => manuallyHighlightPython(), 200);
+                } catch (error) {
+                    console.error('Error while highlighting code:', error);
+                    // Fallback to manual highlighting
+                    manuallyHighlightPython();
+                }
+            }, 100); // Slightly longer timeout to ensure DOM is updated
+        }
     }, [canvas]);
+
+    // Special handling for Python syntax highlighting
+    useEffect(() => {
+        if (canvas.length > 0) {
+            // Check if we have any Python content
+            const hasPythonContent = canvas.some(content =>
+                content.format?.toLowerCase() === 'py' ||
+                content.format?.toLowerCase() === 'python'
+            );
+
+            if (hasPythonContent) {
+                console.log('Python content detected, ensuring proper highlighting');
+                // Multiple triggers with increasing delays to ensure highlighting works
+                // even if DOM updates are slow
+                setTimeout(() => Prism.highlightAll(), 100);
+                setTimeout(() => Prism.highlightAll(), 500);
+                setTimeout(() => Prism.highlightAll(), 1000);
+            }
+        }
+    }, [canvas]);
+
+    // Function to manually trigger Prism highlighting
+    const triggerSyntaxHighlighting = () => {
+        console.log('Manually triggering syntax highlighting');
+        // Wait a bit for the DOM to update
+        setTimeout(() => {
+            try {
+                Prism.highlightAll();
+                // After Prism has done its work, apply our manual Python highlighting
+                setTimeout(() => manuallyHighlightPython(), 50);
+
+                // Also highlight any code blocks in Markdown messages
+                document.querySelectorAll('.message-text pre code').forEach((block) => {
+                    if (block.className.includes('language-')) {
+                        Prism.highlightElement(block);
+                    }
+                });
+            } catch (error) {
+                console.error('Error during syntax highlighting:', error);
+                // Fallback to manual Python highlighting if Prism fails
+                manuallyHighlightPython();
+            }
+        }, 100);
+    };
+
+    // Function to toggle code block expansion
+    const toggleCodeExpansion = (index: number) => {
+        const codeBlock = document.querySelector(`.canvas-content:nth-child(${index + 1}) pre`);
+        if (codeBlock) {
+            codeBlock.classList.toggle('expanded');
+        }
+    };
+
+    // Function to copy code to clipboard
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text).then(
+            () => {
+                // Show feedback to the user
+                setError("Code copied to clipboard!");
+                setTimeout(() => setError(null), 1500);
+
+                // Create visual feedback element
+                const feedbackEl = document.createElement('div');
+                feedbackEl.className = 'copy-success';
+                feedbackEl.textContent = 'Copied to clipboard!';
+                document.body.appendChild(feedbackEl);
+
+                // Remove feedback element after animation
+                setTimeout(() => {
+                    if (document.body.contains(feedbackEl)) {
+                        document.body.removeChild(feedbackEl);
+                    }
+                }, 1500);
+            },
+            err => {
+                console.error('Error copying to clipboard:', err);
+                setError('Failed to copy to clipboard');
+            }
+        );
+    };
+
+    // Canvas resizing handlers
+    const handleResizeMove = useCallback((e: MouseEvent) => {
+        if (!isResizing) return;
+
+        // Calculate new width based on window width and mouse position
+        const containerWidth = window.innerWidth;
+        // Calculate mouse position from right edge of screen
+        const distanceFromRight = containerWidth - e.clientX;
+
+        // Min: 300px, Max: 50% of window width or 800px (whichever is smaller)
+        const maxWidth = Math.min(containerWidth * 0.5, 800);
+        const newWidth = Math.max(300, Math.min(maxWidth, distanceFromRight));
+
+        setCanvasWidth(newWidth);
+    }, [isResizing]);
+
+    const handleResizeEnd = useCallback(() => {
+        setIsResizing(false);
+
+        // Remove event listeners
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+
+        // Remove the resize class from body
+        document.body.classList.remove('resizing');
+
+        // Save width preference to localStorage
+        localStorage.setItem('canvasWidth', canvasWidth.toString());
+    }, [canvasWidth]);
+
+    // Fix circular dependency between handleResizeMove and handleResizeEnd
+    useEffect(() => {
+        if (isResizing) {
+            document.addEventListener('mousemove', handleResizeMove);
+            document.addEventListener('mouseup', handleResizeEnd);
+        }
+        return () => {
+            document.removeEventListener('mousemove', handleResizeMove);
+            document.removeEventListener('mouseup', handleResizeEnd);
+        };
+    }, [isResizing, handleResizeMove, handleResizeEnd]);
+
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+        // The actual event listeners are set in the useEffect above
+
+        // Add a resize class to the body to disable text selection during resize
+        document.body.classList.add('resizing');
+    };
+
+    // Clean up any remaining event listeners on component unmount
+    useEffect(() => {
+        return () => {
+            document.body.classList.remove('resizing');
+        };
+    }, []);
 
     return (
         <div className="App">
@@ -437,7 +758,31 @@ function App() {
                                                         {msg.type === 'user' ? 'You' : 'Assistant'}
                                                     </span>
                                                 </div>
-                                                <div className="message-text">{msg.text}</div>
+                                                <div className="message-text">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                const match = /language-(\w+)/.exec(className || '');
+                                                                const language = match ? match[1] : '';
+
+                                                                return !inline && language ? (
+                                                                    <pre className={`language-${language}`}>
+                                                                        <code className={`language-${language}`} {...props}>
+                                                                            {String(children).replace(/\n$/, '')}
+                                                                        </code>
+                                                                    </pre>
+                                                                ) : (
+                                                                    <code className={className} {...props}>
+                                                                        {children}
+                                                                    </code>
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        {msg.text}
+                                                    </ReactMarkdown>
+                                                </div>
                                                 {msg.files && msg.files.length > 0 && (
                                                     <div className="message-files">
                                                         {msg.files.map((file, fileIndex) => (
@@ -458,10 +803,12 @@ function App() {
                                             <div className="message-header">
                                                 <span className="message-label">Assistant</span>
                                             </div>
-                                            <div className="typing-indicator">
-                                                <span></span>
-                                                <span></span>
-                                                <span></span>
+                                            <div className="message-text">
+                                                <div className="typing-indicator">
+                                                    <span></span>
+                                                    <span></span>
+                                                    <span></span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -536,12 +883,22 @@ function App() {
                         </>
                     )}
                 </div>
-                <div className="canvas-panel">
+                <div className="canvas-panel" style={{ width: `${canvasWidth}px` }}>
+                    <div className={`canvas-resizer ${isResizing ? 'active' : ''}`} onMouseDown={handleResizeStart}></div>
                     <h2>Generated Content</h2>
                     {canvas.map((content, index) => (
-                        <div key={index} className="canvas-content">
+                        <div key={index} className="canvas-content" onClick={() => {
+                            triggerSyntaxHighlighting();
+                            // If it's Python content, ensure it gets special treatment
+                            if (content.format === 'py' || content.format === 'python') {
+                                setTimeout(() => manuallyHighlightPython(), 50);
+                            }
+                        }}>
                             <div className="canvas-header">
-                                <span className="content-type">{content.type || 'Content'} - {content.format || 'text'}</span>
+                                <span className={`content-type content-type-${content.type?.toLowerCase() || 'code'}`}>
+                                    <FontAwesomeIcon icon={getContentTypeIcon(content.type)} className="content-icon" />
+                                    {content.type || 'Content'} - {content.format || 'text'}
+                                </span>
                                 <div className="save-options">
                                     <div className="save-checkbox">
                                         <input
@@ -564,8 +921,37 @@ function App() {
                                     </button>
                                 </div>
                             </div>
-                            <pre className={`language-${content.format ? content.format.toLowerCase() : 'text'}`}>
-                                <code>{content.content}</code>
+                            <pre className={`language-${getLanguageClass(content.format, content.type)}`}>
+                                <code className={`language-${getLanguageClass(content.format, content.type)}`}>
+                                    {content.content}
+                                </code>
+                                {content.format && content.format !== 'text' && (
+                                    <div className="language-badge">
+                                        {content.format}
+                                    </div>
+                                )}
+                                <div className="code-actions">
+                                    <button
+                                        className="code-action-btn copy-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            copyToClipboard(content.content);
+                                        }}
+                                        title="Copy to clipboard"
+                                    >
+                                        <FontAwesomeIcon icon={faCopy} /> Copy
+                                    </button>
+                                    <button
+                                        className="code-action-btn expand-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleCodeExpansion(index);
+                                        }}
+                                        title="Expand/collapse code"
+                                    >
+                                        <FontAwesomeIcon icon={faExpand} /> Expand
+                                    </button>
+                                </div>
                             </pre>
                         </div>
                     ))}
@@ -574,5 +960,173 @@ function App() {
         </div>
     );
 }
+
+// Function to manually highlight Python code in case Prism doesn't do it properly
+const manuallyHighlightPython = () => {
+    // Find all Python code blocks that haven't been highlighted yet
+    const pythonBlocks = document.querySelectorAll('code.language-python:not(.python-highlighted)');
+
+    if (pythonBlocks.length === 0) {
+        return; // No Python blocks found that need highlighting
+    }
+
+    console.log(`Found ${pythonBlocks.length} Python blocks to highlight manually`);
+
+    // Process each block
+    pythonBlocks.forEach((block, index) => {
+        try {
+            // Get the raw content
+            const content = block.textContent || '';
+
+            if (content.trim() === '') {
+                console.log(`Python block ${index} is empty, skipping`);
+                return;
+            }
+
+            console.log(`Manually highlighting Python block ${index}`);
+
+            // Use Prism's Python language definition if available
+            if (Prism.languages.python) {
+                // Highlight the code using Prism's Python grammar
+                const highlightedCode = Prism.highlight(
+                    content,
+                    Prism.languages.python,
+                    'python'
+                );
+
+                // Set the highlighted HTML
+                block.innerHTML = highlightedCode;
+
+                // Add custom CSS class to parent pre element for better styling
+                const preElement = block.closest('pre');
+                if (preElement) {
+                    preElement.classList.add('python-enhanced');
+                }
+
+                // Mark as processed
+                block.classList.add('python-highlighted');
+                console.log(`Successfully highlighted Python block ${index}`);
+            } else {
+                console.error('Python language definition not found in Prism');
+            }
+        } catch (err) {
+            console.error('Error during manual Python highlighting:', err);
+
+            // Fallback: Apply basic syntax highlighting for common Python elements
+            try {
+                // Get the raw content again for the fallback
+                const content = block.textContent || '';
+
+                // Simple regex-based highlighting for basic Python elements
+                let html = content
+                    .replace(/\b(def|class|import|from|as|if|else|elif|for|while|return|yield|try|except|finally|with|in|is|not|and|or|True|False|None)\b/g, '<span class="token keyword">$1</span>')
+                    .replace(/(?<!\w)(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="token string">$&</span>')
+                    .replace(/(#.*)$/gm, '<span class="token comment">$1</span>')
+                    .replace(/\b([0-9]+(?:\.[0-9]+)?)\b/g, '<span class="token number">$1</span>');
+
+                block.innerHTML = html;
+                block.classList.add('python-highlighted');
+                console.log(`Applied fallback highlighting for Python block ${index}`);
+            } catch (fallbackError) {
+                console.error('Fallback highlighting also failed:', fallbackError);
+            }
+        }
+    });
+
+    // Apply additional DOM-based styles for Python elements
+    document.querySelectorAll('.python-highlighted .token.keyword').forEach(keyword => {
+        keyword.classList.add('python-keyword');
+    });
+};
+
+// Function to detect Python code based on patterns
+const detectPythonCode = (content: string): boolean => {
+    if (!content) return false;
+
+    // Look for Python-specific patterns
+    const pythonPatterns = [
+        /\bdef\s+\w+\s*\(/,                    // Function definitions
+        /\bclass\s+\w+\s*[:\(]/,               // Class definitions
+        /\bimport\s+\w+/,                      // Import statements
+        /\bfrom\s+\w+\s+import/,               // From import statements
+        /^\s*if\s+.*:\s*$/m,                   // If statements with colon
+        /^\s*for\s+.*\s+in\s+.*:\s*$/m,        // For loops
+        /^\s*while\s+.*:\s*$/m,                // While loops
+        /\bprint\s*\(/,                        // Print function
+        /^\s*@\w+/m                            // Decorators
+    ];
+
+    // Check if at least 2 patterns match to reduce false positives
+    const matchCount = pythonPatterns.filter(pattern => pattern.test(content)).length;
+    return matchCount >= 2;
+};
+
+// Function to detect language from code content
+const detectLanguage = (content: string): string | null => {
+    if (!content || content.trim().length < 20) return null;
+
+    // Look for common language patterns
+    const patterns: { [key: string]: RegExp[] } = {
+        // JavaScript patterns
+        'js': [
+            /\bconst\s+\w+\s*=/,               // const declarations
+            /\blet\s+\w+\s*=/,                 // let declarations
+            /\bfunction\s+\w+\s*\(/,           // function declarations
+            /=>\s*{/,                          // Arrow functions
+            /\bdocument\.\w+/,                 // DOM manipulation
+            /\bconsole\.log\(/                 // console.log
+        ],
+
+        // TypeScript patterns
+        'ts': [
+            /:\s*\w+Type\b/,                  // Type annotations
+            /interface\s+\w+\s*{/,            // Interface declarations
+            /\w+<\w+>/,                       // Generics
+            /:\s*string\b/,                   // string type
+            /:\s*number\b/,                   // number type
+            /:\s*boolean\b/                   // boolean type
+        ],
+
+        // Python patterns
+        'py': [
+            /\bdef\s+\w+\s*\(/,               // Function definitions
+            /\bclass\s+\w+\s*[:\(]/,          // Class definitions
+            /\bimport\s+\w+/,                 // Import statements
+            /\bfrom\s+\w+\s+import/,          // From import statements
+            /^\s*if\s+.*:\s*$/m,              // If statements with colon
+            /^\s*for\s+.*\s+in\s+.*:\s*$/m    // For loops
+        ],
+
+        // Java patterns
+        'java': [
+            /\bpublic\s+class\s+\w+/,         // Class declarations
+            /\bpublic\s+(static\s+)?\w+\s+\w+\s*\(/,  // Method declarations
+            /\bSystem\.out\.println\(/,       // Print statements
+            /\bnew\s+\w+\s*\(/,               // Object instantiation
+            /\bprivate\s+\w+\s+\w+/           // Private fields
+        ]
+    };
+
+    // Check patterns for each language
+    const results: { [key: string]: number } = {};
+
+    for (const [lang, langPatterns] of Object.entries(patterns)) {
+        const matchCount = langPatterns.filter(pattern => pattern.test(content)).length;
+        results[lang] = matchCount;
+    }
+
+    // Find the language with the most matches
+    let bestMatch = null;
+    let maxMatches = 1; // Require at least 2 matches
+
+    for (const [lang, count] of Object.entries(results)) {
+        if (count > maxMatches) {
+            maxMatches = count;
+            bestMatch = lang;
+        }
+    }
+
+    return bestMatch;
+};
 
 export default App;

@@ -37,6 +37,13 @@ export interface ChatResponse {
     };
 }
 
+// Enhanced response structure with success/data wrapper
+export interface ApiChatResponse {
+    success: boolean;
+    data?: ChatResponse;
+    error?: ApiErrorResponse;
+}
+
 export interface DocumentResponse {
     id: string;
     content: string;
@@ -161,7 +168,23 @@ export class ApiClient {
     // Chat Operations
     async createNewChat(): Promise<string> {
         try {
-            const response = await this.client.post<{ chatId: string }>('/chat/new');
+            const response = await this.client.post<any>('/chat/new');
+
+            // Handle the unified response format
+            if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+                const apiResponse = response.data as ApiResponse<{ chatId: string }>;
+                if (apiResponse.success && apiResponse.data?.chatId) {
+                    return apiResponse.data.chatId;
+                } else if (!apiResponse.success && apiResponse.error) {
+                    throw new ApiError(
+                        apiResponse.error.code || 'CHAT_CREATION_ERROR',
+                        apiResponse.error.message || 'Failed to create new chat',
+                        apiResponse.error.data
+                    );
+                }
+            }
+
+            // Handle legacy format
             if (!response.data?.chatId) {
                 throw new Error('Invalid response from server: missing chatId');
             }
@@ -185,10 +208,26 @@ export class ApiClient {
 
     async getChatHistory(chatId: string): Promise<ChatMessage[]> {
         try {
-            const response = await this.client.get<ChatMessage[]>(`/chat/${chatId}/history`);
+            const response = await this.client.get<any>(`/chat/${chatId}/history`);
+
+            // Handle the unified response format
+            if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+                const apiResponse = response.data as ApiResponse<ChatMessage[]>;
+                if (apiResponse.success && apiResponse.data) {
+                    return apiResponse.data;
+                } else if (!apiResponse.success && apiResponse.error) {
+                    throw new ApiError(
+                        apiResponse.error.code || 'CHAT_HISTORY_ERROR',
+                        apiResponse.error.message || 'Failed to fetch chat history',
+                        apiResponse.error.data
+                    );
+                }
+            }
+
+            // Return legacy format directly
             return response.data;
         } catch (error) {
-            console.error('Error fetching chat history:', error);
+            console.error('Error loading chat history:', error);
             throw new Error('Failed to fetch chat history');
         }
     }
@@ -208,13 +247,30 @@ export class ApiClient {
                 formData.append('files', file);
             });
 
-            const response = await this.client.post<ChatResponse>('/chat/message', formData, {
+            // Use the unified response format or legacy format
+            const response = await this.client.post<any>('/chat/message', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
 
-            return response.data;
+            // Handle both response formats
+            if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+                // New format with success/data wrapper
+                const apiResponse = response.data as ApiResponse<ChatResponse>;
+                if (apiResponse.success && apiResponse.data) {
+                    return apiResponse.data;
+                } else if (!apiResponse.success && apiResponse.error) {
+                    throw new ApiError(
+                        apiResponse.error.code || 'UNKNOWN_ERROR',
+                        apiResponse.error.message || 'An unknown error occurred',
+                        apiResponse.error.data
+                    );
+                }
+            }
+
+            // Legacy format without wrapper
+            return response.data as ChatResponse;
         } catch (error) {
             console.error('Error sending message:', error);
             throw error;
@@ -285,12 +341,33 @@ export class ApiClient {
 
     // Save Content to Server
     async saveContentToServer(content: string, format: string, filename: string): Promise<{ path: string, message: string }> {
-        const response = await this.client.post('/save', {
-            content,
-            format,
-            filename
-        });
-        return response.data;
+        try {
+            const response = await this.client.post<any>('/save', {
+                content,
+                format,
+                filename
+            });
+
+            // Handle the unified response format
+            if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+                const apiResponse = response.data as ApiResponse<{ path: string, message: string }>;
+                if (apiResponse.success && apiResponse.data) {
+                    return apiResponse.data;
+                } else if (!apiResponse.success && apiResponse.error) {
+                    throw new ApiError(
+                        apiResponse.error.code || 'SAVE_CONTENT_ERROR',
+                        apiResponse.error.message || 'Failed to save content',
+                        apiResponse.error.data
+                    );
+                }
+            }
+
+            // Return legacy format directly
+            return response.data;
+        } catch (error) {
+            console.error('Error saving content:', error);
+            throw error;
+        }
     }
 }
 

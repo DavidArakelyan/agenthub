@@ -1,0 +1,87 @@
+/* Additional code block styling */
+
+/* Tab size consistency */
+.canvas-content code {
+    tab-size: 4;
+    -moz-tab-size: 4;
+}
+
+/* Improved code block accessibility */
+.code-action-btn:focus {
+    outline: 2px solid #10a37f;
+    outline-offset: 2px;
+}
+
+/* More visible copy feedback */
+.copy-success {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #10a37f;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    animation: fadeInOut 1.5s ease-in-out;
+    z-index: 1000;
+}
+
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    90% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Better language recognition indicator */
+.language-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+/* Python-specific syntax improvements */
+.python-indentation {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    opacity: 0.15;
+    border-left: 1px solid currentColor;
+}
+
+/* Token improvements for better visibility */
+.token.important {
+    font-weight: bold;
+}
+
+.token.entity {
+    cursor: help;
+}
+
+/* Additional language detection feedback */
+.language-detected {
+    font-style: italic;
+    color: #10a37f;
+    margin-left: 10px;
+    font-size: 0.8em;
+}
