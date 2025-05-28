@@ -375,16 +375,26 @@ async def upload_document(
             "uploaded_at": datetime.utcnow().isoformat(),
         }
 
-        return DocumentResponse(
+        document_response = DocumentResponse(
             id=doc_id,
             content=content.decode(),
             metadata=doc_metadata,
         )
+        
+        return {
+            "success": True,
+            "data": document_response.dict()
+        }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error uploading document: {str(e)}"
-        )
+        return {
+            "success": False,
+            "error": {
+                "code": "DOCUMENT_UPLOAD_ERROR",
+                "message": f"Error uploading document: {str(e)}",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.get("/documents/search")
@@ -402,24 +412,39 @@ async def search_documents(
         )
 
         if not response.success:
-            raise HTTPException(
-                status_code=500, detail=f"Error searching documents: {response.error}"
-            )
+            return {
+                "success": False,
+                "error": {
+                    "code": "DOCUMENT_SEARCH_ERROR",
+                    "message": f"Error searching documents: {response.error}",
+                    "data": {}
+                }
+            }
 
         # Convert results to DocumentResponse format
-        return [
+        documents_list = [
             DocumentResponse(
                 id=str(i),
                 content=doc["content"],
                 metadata=doc["metadata"],
-            )
+            ).dict()
             for i, doc in enumerate(response.data["documents"])
         ]
+        
+        return {
+            "success": True,
+            "data": documents_list
+        }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error searching documents: {str(e)}"
-        )
+        return {
+            "success": False,
+            "error": {
+                "code": "DOCUMENT_SEARCH_ERROR",
+                "message": f"Error searching documents: {str(e)}",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.get("/websearch/search")
@@ -428,7 +453,7 @@ async def web_search(query: str = Query(...)):
     try:
         # TODO: Implement actual web search
         # For now, return a mock response
-        return WebSearchResponse(
+        response_data = WebSearchResponse(
             results=[
                 {
                     "title": "Sample Result",
@@ -439,17 +464,30 @@ async def web_search(query: str = Query(...)):
             query=query,
             timestamp=datetime.utcnow().isoformat(),
         )
+        
+        return {
+            "success": True,
+            "data": response_data.dict()
+        }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error performing web search: {str(e)}"
-        )
+        return {
+            "success": False,
+            "error": {
+                "code": "WEB_SEARCH_ERROR",
+                "message": f"Error performing web search: {str(e)}",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    return {
+        "success": True,
+        "data": {"status": "healthy"}
+    }
 
 
 class SaveContentRequest(BaseModel):
@@ -476,12 +514,21 @@ async def save_content(request: SaveContentRequest):
 
         return {
             "success": True,
-            "path": str(file_path),
-            "message": f"Content saved successfully to {request.filename}",
+            "data": {
+                "path": str(file_path),
+                "message": f"Content saved successfully to {request.filename}",
+            }
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving content: {str(e)}")
+        return {
+            "success": False,
+            "error": {
+                "code": "SAVE_CONTENT_ERROR",
+                "message": f"Error saving content: {str(e)}",
+                "data": {"type": str(type(e).__name__)},
+            },
+        }
 
 
 @app.get("/chat/list")

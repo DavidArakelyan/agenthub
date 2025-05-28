@@ -106,6 +106,12 @@ function App() {
             setIsLoading(true);
             setError(null);
 
+            // Check connection first
+            const isConnected = await apiClient.checkConnection();
+            if (!isConnected) {
+                throw new Error('Cannot connect to the server. Please check if the orchestrator service is running.');
+            }
+
             const chatId = await apiClient.createNewChat();
             const newChat: Chat = {
                 id: chatId,

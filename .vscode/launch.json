@@ -41,6 +41,26 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Frontend: Chrome",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}/services/frontend",
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${workspaceFolder}/services/frontend/src/*"
+            },
+            "preLaunchTask": "start-frontend-dev",
+            "userDataDir": "${workspaceFolder}/.vscode/chrome-debug-profile",
+            "runtimeArgs": [
+                "--remote-debugging-port=9222"
+            ],
+            "serverReadyAction": {
+                "pattern": "Compiled successfully|webpack compiled successfully",
+                "uriFormat": "http://localhost:3000",
+                "action": "debugWithChrome"
+            }
         }
     ],
     "compounds": [
@@ -49,6 +69,18 @@
             "configurations": [
                 "Python: FastAPI Backend"
             ]
+        },
+        {
+            "name": "Debug Frontend + Orchestrator",
+            "configurations": [
+                "Python: FastAPI Backend",
+                "Frontend: Chrome"
+            ],
+            "presentation": {
+                "hidden": false,
+                "group": "main"
+            },
+            "stopAll": true
         }
     ]
 }

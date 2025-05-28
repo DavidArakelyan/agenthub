@@ -457,9 +457,16 @@ class OrchestratorClient:
         )
 
         if response.status_code == 200:
-            data = response.json()
-            print_success(f"Document uploaded successfully with ID: {data.id}")
-            return data
+            response_data = response.json()
+            if response_data.get("success", False):
+                doc_data = response_data["data"]
+                print_success(f"Document uploaded successfully with ID: {doc_data['id']}")
+                return doc_data
+            else:
+                print_error(
+                    f"Failed to upload document: {response_data.get('error', {}).get('message', 'Unknown error')}"
+                )
+                return None
         else:
             print_error(f"HTTP Error: {response.status_code} - {response.text}")
             return None
@@ -472,9 +479,16 @@ class OrchestratorClient:
         )
 
         if response.status_code == 200:
-            results = response.json()
-            print_success(f"Found {len(results)} document(s)")
-            return results
+            response_data = response.json()
+            if response_data.get("success", False):
+                results = response_data["data"]
+                print_success(f"Found {len(results)} document(s)")
+                return results
+            else:
+                print_error(
+                    f"Failed to search documents: {response_data.get('error', {}).get('message', 'Unknown error')}"
+                )
+                return None
         else:
             print_error(f"HTTP Error: {response.status_code} - {response.text}")
             return None
@@ -487,9 +501,16 @@ class OrchestratorClient:
         )
 
         if response.status_code == 200:
-            result = response.json()
-            print_success(f"Web search completed with {len(result.results)} results")
-            return result
+            response_data = response.json()
+            if response_data.get("success", False):
+                result = response_data["data"]
+                print_success(f"Web search completed with {len(result.get('results', []))} results")
+                return result
+            else:
+                print_error(
+                    f"Failed to perform web search: {response_data.get('error', {}).get('message', 'Unknown error')}"
+                )
+                return None
         else:
             print_error(f"HTTP Error: {response.status_code} - {response.text}")
             return None
@@ -500,8 +521,13 @@ class OrchestratorClient:
             print_info("Checking orchestrator service health...")
             response = requests.get(f"{self.base_url}/health")
             if response.status_code == 200:
-                print_success("Orchestrator service is healthy")
-                return True
+                response_data = response.json()
+                if response_data.get("success", False) and response_data.get("data", {}).get("status") == "healthy":
+                    print_success("Orchestrator service is healthy")
+                    return True
+                else:
+                    print_error("Service returned unhealthy status")
+                    return False
             else:
                 print_error(f"Service returned status code: {response.status_code}")
                 return False
@@ -519,9 +545,16 @@ class OrchestratorClient:
         response = requests.post(f"{self.base_url}/save", json=data)
 
         if response.status_code == 200:
-            result = response.json()
-            print_success(f"Content saved successfully to: {result.get('path')}")
-            return result
+            response_data = response.json()
+            if response_data.get("success", False):
+                result = response_data["data"]
+                print_success(f"Content saved successfully to: {result.get('path')}")
+                return result
+            else:
+                print_error(
+                    f"Failed to save content: {response_data.get('error', {}).get('message', 'Unknown error')}"
+                )
+                return None
         else:
             print_error(f"HTTP Error: {response.status_code} - {response.text}")
             return None

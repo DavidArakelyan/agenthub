@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "start-frontend-dev",
+            "type": "shell",
+            "command": "kill -9 $(lsof -ti:3000) 2>/dev/null || true; rm -rf ${workspaceFolder}/.vscode/chrome-debug-profile && mkdir -p ${workspaceFolder}/.vscode/chrome-debug-profile; cd ${workspaceFolder}/services/frontend && npm start",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Starting the development server",
+                    "endsPattern": "Compiled successfully|Failed to compile"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}

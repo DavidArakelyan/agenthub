@@ -68,11 +68,13 @@ export class ApiError extends Error {
 
 // API Client
 export class ApiClient {
+    private readonly baseUrl: string;
     private client: AxiosInstance;
 
     constructor() {
+        this.baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
         this.client = axios.create({
-            baseURL: API_BASE_URL,
+            baseURL: this.baseUrl,
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -93,15 +95,20 @@ export class ApiClient {
         // Add response interceptor for error handling
         this.client.interceptors.response.use(
             (response) => {
-                const apiResponse = response.data as ApiResponse<any>;
-                if (!apiResponse.success) {
-                    throw new ApiError(
-                        apiResponse.error?.code || 'UNKNOWN_ERROR',
-                        apiResponse.error?.message || 'An unknown error occurred',
-                        apiResponse.error?.data
-                    );
+                // Check if response has the ApiResponse format with success property
+                if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+                    const apiResponse = response.data as ApiResponse<any>;
+                    if (!apiResponse.success) {
+                        throw new ApiError(
+                            apiResponse.error?.code || 'UNKNOWN_ERROR',
+                            apiResponse.error?.message || 'An unknown error occurred',
+                            apiResponse.error?.data
+                        );
+                    }
+                    return apiResponse;
                 }
-                return apiResponse.data;
+                // If it's a direct response (without success wrapper), return it as is
+                return response.data;
             },
             (error: AxiosError) => {
                 if (error.response?.status === 401) {
@@ -136,14 +143,28 @@ export class ApiClient {
         });
     }
 
+    // Add a getter if you need to access baseUrl from outside
+    public getBaseUrl(): string {
+        return this.baseUrl;
+    }
+
+    async checkConnection(): Promise<boolean> {
+        try {
+            const response = await fetch(`${this.baseUrl}/health`);
+            return response.status === 200;
+        } catch (error) {
+            return false;
+        }
+    }
+
     // Chat Operations
     async createNewChat(): Promise<string> {
         try {
-            const response = await this.client.post<ApiResponse<{ chatId: string }>>('/chat/new');
-            if (!response.data?.success || !response.data.data?.chatId) {
+            const response = await this.client.post<{ chatId: string }>('/chat/new');
+            if (!response.data?.chatId) {
                 throw new Error('Invalid response from server: missing chatId');
             }
-            return response.data.data.chatId;
+            return response.data.chatId;
         } catch (error) {
             if (error instanceof AxiosError) {
                 console.error('Error creating new chat:', {
