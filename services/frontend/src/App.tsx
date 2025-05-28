@@ -204,7 +204,17 @@ function App() {
 
             // Update canvas if there's generated content
             if (response.canvas_content) {
-                setCanvas([...canvas, response.canvas_content]);
+                // Create a GeneratedContent object from the raw content
+                const normalizedContent: GeneratedContent = {
+                    // Based on the backend's GeneratorType enum: 'code', 'document', or 'none'
+                    // For now using 'Content' as a default since we don't get the type from the API
+                    type: 'Code',
+                    // Use target_format if available, otherwise default to 'text'
+                    format: response.target_format || 'text',
+                    // The canvas_content is the actual raw content string
+                    content: response.canvas_content
+                };
+                setCanvas([...canvas, normalizedContent]);
             }
 
             // Update chat in state
@@ -316,8 +326,9 @@ function App() {
     const handleSaveCanvas = async (content: GeneratedContent, index: number) => {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const extension = content.format.toLowerCase();
-            const filename = `generated_${content.type}_${timestamp}.${extension}`;
+            // Ensure we have a valid format, defaulting to 'txt' if missing or if toLowerCase() would fail
+            const extension = content.format ? content.format.toLowerCase() : 'txt';
+            const filename = `generated_${content.type || 'content'}_${timestamp}.${extension}`;
 
             // Create a blob and trigger browser download
             const blob = new Blob([content.content], { type: 'text/plain' });
@@ -337,7 +348,7 @@ function App() {
             if (serverSaveEnabled[index]) {
                 const { message } = await apiClient.saveContentToServer(
                     content.content,
-                    content.format,
+                    content.format || 'text',
                     filename
                 );
                 setError(message);
@@ -530,7 +541,7 @@ function App() {
                     {canvas.map((content, index) => (
                         <div key={index} className="canvas-content">
                             <div className="canvas-header">
-                                <span className="content-type">{content.type} - {content.format}</span>
+                                <span className="content-type">{content.type || 'Content'} - {content.format || 'text'}</span>
                                 <div className="save-options">
                                     <div className="save-checkbox">
                                         <input
@@ -553,7 +564,7 @@ function App() {
                                     </button>
                                 </div>
                             </div>
-                            <pre className={`language-${content.format.toLowerCase()}`}>
+                            <pre className={`language-${content.format ? content.format.toLowerCase() : 'text'}`}>
                                 <code>{content.content}</code>
                             </pre>
                         </div>

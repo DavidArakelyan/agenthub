@@ -29,7 +29,8 @@ export interface Chat {
 
 export interface ChatResponse {
     message: string;
-    canvas_content?: GeneratedContent;
+    canvas_content?: string;
+    target_format?: string;
     task_status?: {
         needs_web_search: boolean;
         needs_document_processing: boolean;

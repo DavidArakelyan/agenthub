@@ -39,6 +39,7 @@ yarn-error.log*
 .idea/
 .vscode/temp/*
 .vscode/*.log
+.vscode/chrome-debug-profile
 *.swp
 *.swo
 
