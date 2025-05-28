@@ -55,7 +55,7 @@ class AgentWorkflow:
             }
 
     def invoke(self, state):
-        """Synchronous wrapper for ainvoke."""
+        """Invoke the workflow synchronously."""
         try:
             logger.info(f"Processing state synchronously: {state}")
             # Execute the workflow synchronously
