@@ -57,7 +57,11 @@ The service first classifies queries into two categories:
    - Supports multiple languages:
      - Python (.py)
      - C++ (.cpp)
+     - C (.c)
      - Java (.java)
+     - JavaScript (.js)
+     - TypeScript (.ts)
+     - And others
 
 5. **Document Generator** (Conditional)
    - Activated for document generation requests
@@ -71,6 +75,8 @@ The service first classifies queries into two categories:
    - Generates final responses based on collected information
    - Uses context from all previous steps
    - Updates the conversation with the response
+   - Stores only pure generated content in canvas_content
+   - Includes target_format for proper file extension determination
 
 ### Workflow Logic
 
@@ -134,6 +140,21 @@ The service uses environment variables for configuration:
    - Model: `gpt-4.1`
    - Temperature: 0.7
 
+### Content Generation and Saving
+
+The service includes a sophisticated content saving mechanism that:
+
+1. **Extracts Pure Content** - Ensures that only the actual generated content (code, document) is stored, without explanatory text or comments
+2. **Detects File Types** - Analyzes content patterns to determine the appropriate file type:
+   - For code: Examines syntax patterns, markers, imports, and language hints
+   - For documents: Detects format based on structure and content
+3. **Sets Proper File Extensions** - Intelligently assigns the correct file extension:
+   - C/C++ code is saved with .c or .cpp extensions
+   - Python code with .py
+   - Markdown with .md
+   - And others based on content analysis
+4. **Handles Multiple Formats** - Supports various programming languages and document formats
+
 ### Service Configuration
 - `ENVIRONMENT`: Service environment (default: "development")
 - `DEBUG`: Debug mode flag (default: false)
@@ -147,7 +168,38 @@ The service uses environment variables for configuration:
 
 2. Run the service:
    ```bash
-   ./run.sh
+   ./run_orchestrator_service.sh
    ```
 
-The service will be available at `http://localhost:8000`. 
+The service will be available at `http://localhost:8000`.
+
+## Testing
+
+The service includes several testing scripts:
+
+1. **Automated Tests**:
+   ```bash
+   ./run_automated_tests.sh
+   ```
+   Runs a full suite of tests for all core functionality.
+
+2. **Specialized Tests**:
+   ```bash
+   # Test pure content extraction
+   ./run_test_pure_content.sh
+
+   # Test C++ detection and file extension handling
+   ./run_test_cpp_detection.sh
+   
+   # Test C++ detection with automatic service startup
+   ./run_test_cpp_detection_with_service.sh
+
+   # Test content extraction from various formats
+   ./run_test_content_extraction.sh
+   ```
+
+3. **Interactive Testing**:
+   ```bash
+   ./run_test_cli.sh
+   ```
+   Provides an interactive CLI for testing the service endpoints manually. 

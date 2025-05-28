@@ -1,6 +1,10 @@
 #!/bin/bash
 # Run the C++ detection test script
 
+# Get the directory of this script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$DIR"
+
 # Set the path to the Python executable
 PYTHON_EXEC="python"
 

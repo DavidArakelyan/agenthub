@@ -66,6 +66,24 @@ This will:
    - Web search functionality
 4. Report the results
 
+### Specialized Test Scripts
+
+Several specialized test scripts are available for testing specific functionality:
+
+```bash
+# Test pure content extraction
+./run_test_pure_content.sh
+
+# Test C++ code detection and file extension handling
+./run_test_cpp_detection.sh
+
+# Test C++ detection with automatic service startup
+./run_test_cpp_detection_with_service.sh
+
+# Test content extraction from different formats
+./run_test_content_extraction.sh
+```
+
 For CI/CD pipelines, you can use:
 
 ```bash

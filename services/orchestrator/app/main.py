@@ -114,6 +114,7 @@ class ChatResponse(BaseModel):
     message: str
     canvas_content: Optional[str] = None
     task_status: Optional[Dict[str, Any]] = None
+    target_format: Optional[str] = None
 
 
 class DocumentResponse(BaseModel):
@@ -233,9 +234,7 @@ async def send_message(
 
             # Get target format if available
             target_format = None
-            if "context" in final_state and "target_format" in final_state["context"]:
-                target_format = final_state["context"]["target_format"]
-            elif (
+            if (
                 "query" in final_state
                 and hasattr(final_state["query"], "code_language")
                 and final_state["query"].code_language

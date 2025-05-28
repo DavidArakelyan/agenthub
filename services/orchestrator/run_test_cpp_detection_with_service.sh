@@ -1,0 +1,47 @@
+#!/bin/bash
+# A simple script to test the C++ file extension handling
+# filepath: /Users/davida/workspace/agenthub/services/orchestrator/run_test_cpp_detection_with_service.sh
+
+# Get the directory of this script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$DIR"
+
+# Check if the orchestrator service is running
+if ! curl -s http://localhost:8000/health >/dev/null; then
+  echo "Starting orchestrator service..."
+  ./run_orchestrator_service.sh &
+  SERVICE_PID=$!
+  
+  # Wait for service to start
+  echo "Waiting for service to start..."
+  for i in {1..10}; do
+    if curl -s http://localhost:8000/health >/dev/null; then
+      echo "Service is up and running!"
+      break
+    fi
+    
+    if [ $i -eq 10 ]; then
+      echo "Service failed to start within the timeout period."
+      kill $SERVICE_PID 2>/dev/null
+      exit 1
+    fi
+    
+    echo "Waiting... ($i/10)"
+    sleep 2
+  done
+  
+  # Give it an extra second just to be safe
+  sleep 1
+fi
+
+# Run the C++ detection test
+echo "Running C++ detection test..."
+./run_test_cpp_detection.sh
+
+# Check if we started the service and need to stop it
+if [ -n "$SERVICE_PID" ]; then
+  echo "Stopping orchestrator service..."
+  kill $SERVICE_PID 2>/dev/null
+fi
+
+echo "Test completed!"
