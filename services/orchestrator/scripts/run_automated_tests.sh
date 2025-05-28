@@ -3,6 +3,7 @@
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PARENT_DIR="$(dirname "$DIR")"
 
 # Check if the orchestrator service is running
 if ! curl -s http://localhost:8000/health >/dev/null; then
@@ -36,7 +37,7 @@ fi
 
 # Run the automated tests
 echo "Running automated tests..."
-"$DIR/run_test_cli.sh" --test
+"$PARENT_DIR/run_test_endpoint_cli.sh" --test
 
 # Store the exit code
 EXIT_CODE=$?

@@ -27,7 +27,7 @@ This CLI tool provides a convenient way to test the orchestrator service's backe
 The interactive mode provides a shell-like interface to test the orchestrator service:
 
 ```bash
-./run_test_cli.sh
+./run_test_endpoint_cli.sh
 ```
 
 Once in the interactive shell, you can use the following commands:
@@ -87,7 +87,7 @@ Several specialized test scripts are available for testing specific functionalit
 For CI/CD pipelines, you can use:
 
 ```bash
-./run_test_cli.sh --test
+./run_test_endpoint_cli.sh --test
 ```
 
 This will exit with a non-zero status code if any tests fail.
@@ -97,7 +97,7 @@ This will exit with a non-zero status code if any tests fail.
 By default, the CLI tool connects to `http://localhost:8000`. You can specify a different URL:
 
 ```bash
-./run_test_cli.sh --url http://example.com:8000
+./run_test_endpoint_cli.sh --url http://example.com:8000
 ```
 
 ## Example Workflow
@@ -111,7 +111,7 @@ Here's a typical workflow for manual testing:
 
 2. In another terminal, run the CLI tool:
    ```bash
-   ./run_test_cli.sh
+   ./run_test_endpoint_cli.sh
    ```
 
 3. Create a new chat session:

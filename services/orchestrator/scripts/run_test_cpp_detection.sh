@@ -3,7 +3,7 @@
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR"
+cd "$DIR/.."
 
 # Set the path to the Python executable
 PYTHON_EXEC="python"
@@ -14,8 +14,5 @@ if [ -d ".venv_orchestrator" ]; then
     PYTHON_EXEC=".venv_orchestrator/bin/python"
 fi
 
-# Make the test script executable
-chmod +x test_cpp_detection.py
-
 # Run the test script
-$PYTHON_EXEC test_cpp_detection.py "$@"
+$PYTHON_EXEC -m tests.test_cpp_detection "$@"

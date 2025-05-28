@@ -11,7 +11,15 @@ import sys
 from typing import Dict, Any, Optional
 
 # Import the extraction function directly
-from test_orchestrator_cli import OrchestratorClient, print_success, print_error, Colors
+import sys, os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from .test_orchestrator_cli import (
+    OrchestratorClient,
+    print_success,
+    print_error,
+    Colors,
+)
 
 
 def test_canvas_content_extraction():

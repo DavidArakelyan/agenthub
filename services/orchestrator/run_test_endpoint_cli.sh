@@ -13,7 +13,7 @@ fi
 pip show tabulate >/dev/null 2>&1 || pip install tabulate
 
 # Run the CLI tool
-python "$DIR/test_orchestrator_cli.py" "$@"
+python -m tests.test_orchestrator_cli "$@"
 
 # Deactivate virtual environment if we activated it
 if [ -d "$DIR/.venv_orchestrator" ]; then

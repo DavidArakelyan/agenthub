@@ -168,10 +168,23 @@ The service includes a sophisticated content saving mechanism that:
 
 2. Run the service:
    ```bash
-   ./run_orchestrator_service.sh
+   ./scripts/run_orchestrator_service.sh
    ```
 
 The service will be available at `http://localhost:8000`.
+
+## Project Structure
+
+```
+orchestrator/
+├── app/                   # Main application code
+├── scripts/               # Shell scripts for running services and tests
+├── tests/                 # Test files for the application
+├── generated_content/     # Directory for generated content
+├── uploads/               # Directory for uploaded files
+├── run_test_endpoint_cli.sh # CLI test script for testing endpoints
+└── run_test_workflow_cli.py # CLI test script for testing the workflow directly
+```
 
 ## Testing
 
@@ -179,27 +192,27 @@ The service includes several testing scripts:
 
 1. **Automated Tests**:
    ```bash
-   ./run_automated_tests.sh
+   ./scripts/run_automated_tests.sh
    ```
    Runs a full suite of tests for all core functionality.
 
 2. **Specialized Tests**:
    ```bash
    # Test pure content extraction
-   ./run_test_pure_content.sh
+   ./scripts/run_test_pure_content.sh
 
    # Test C++ detection and file extension handling
-   ./run_test_cpp_detection.sh
+   ./scripts/run_test_cpp_detection.sh
    
    # Test C++ detection with automatic service startup
-   ./run_test_cpp_detection_with_service.sh
+   ./scripts/run_test_cpp_detection_with_service.sh
 
    # Test content extraction from various formats
-   ./run_test_content_extraction.sh
+   ./scripts/run_test_content_extraction.sh
    ```
 
 3. **Interactive Testing**:
    ```bash
-   ./run_test_cli.sh
+   ./run_test_endpoint_cli.sh
    ```
    Provides an interactive CLI for testing the service endpoints manually. 

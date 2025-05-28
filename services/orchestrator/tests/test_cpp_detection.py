@@ -18,7 +18,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
-from test_orchestrator_cli import (
+# Add the parent directory to the path so we can import test_orchestrator_cli
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from .test_orchestrator_cli import (
     OrchestratorClient,
     Colors,
     print_success,

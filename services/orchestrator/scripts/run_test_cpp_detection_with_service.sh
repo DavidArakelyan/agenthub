@@ -1,15 +1,14 @@
 #!/bin/bash
 # A simple script to test the C++ file extension handling
-# filepath: /Users/davida/workspace/agenthub/services/orchestrator/run_test_cpp_detection_with_service.sh
+# filepath: /Users/davida/workspace/agenthub/services/orchestrator/scripts/run_test_cpp_detection_with_service.sh
 
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR"
 
 # Check if the orchestrator service is running
 if ! curl -s http://localhost:8000/health >/dev/null; then
   echo "Starting orchestrator service..."
-  ./run_orchestrator_service.sh &
+  "$DIR/run_orchestrator_service.sh" &
   SERVICE_PID=$!
   
   # Wait for service to start
@@ -36,7 +35,7 @@ fi
 
 # Run the C++ detection test
 echo "Running C++ detection test..."
-./run_test_cpp_detection.sh
+"$DIR/run_test_cpp_detection.sh"
 
 # Check if we started the service and need to stop it
 if [ -n "$SERVICE_PID" ]; then
