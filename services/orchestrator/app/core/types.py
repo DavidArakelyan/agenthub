@@ -13,6 +13,12 @@ class GeneratorType(str, Enum):
     DOCUMENT = "document"
     NONE = "none"
 
+class QueryAction(str, Enum):
+    """Types of query actions."""
+    
+    NEW = "new"
+    UPDATE = "update"
+
 
 class CodeLanguage(str, Enum):
     """Supported programming languages."""
@@ -53,6 +59,9 @@ class ComplexQuery(BaseQuery):
     generator_type: GeneratorType = GeneratorType.NONE
     code_language: Optional[CodeLanguage] = None
     document_format: Optional[DocumentFormat] = None
+    action: QueryAction = QueryAction.NEW
+    previous_content: Optional[str] = None
+    file_identifier: Optional[str] = None  # To identify which file to update
 
 
 class AgentState(TypedDict):

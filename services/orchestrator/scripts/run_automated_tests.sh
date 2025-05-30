@@ -39,6 +39,10 @@ fi
 echo "Running automated tests..."
 "$PARENT_DIR/run_test_endpoint_cli.sh" --test
 
+# Run the update query tests
+echo "Running update query tests..."
+python -m pytest "$PARENT_DIR/tests/test_content_retriever.py" "$PARENT_DIR/tests/test_update_workflow.py" "$PARENT_DIR/tests/test_document_update_workflow.py" -v
+
 # Store the exit code
 EXIT_CODE=$?
 

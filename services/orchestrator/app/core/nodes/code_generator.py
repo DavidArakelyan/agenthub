@@ -1,9 +1,10 @@
 """Code generator node for workflow."""
 
 import logging
+import time as import_time
 from langchain_openai import ChatOpenAI  # Updated import
 from langchain_core.prompts import ChatPromptTemplate
-from app.core.types import ComplexQuery, CodeLanguage
+from app.core.types import ComplexQuery, CodeLanguage, QueryAction
 from app.core.config import get_settings
 from app.core.types import AgentState
 from app.core.utils import validate_typescript_code
@@ -18,23 +19,9 @@ def sync_code_generator(state: AgentState) -> AgentState:
     """
     import asyncio
 
-    try:
-        # Try to get the existing loop
-        loop = asyncio.get_event_loop()
-        should_close_loop = False
-    except RuntimeError:
-        # Create a new loop if none exists
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        should_close_loop = True
-
-    try:
-        # Run the async code generator
-        return loop.run_until_complete(code_generator(state))
-    finally:
-        # Only close the loop if we created it
-        if should_close_loop:
-            loop.close()
+    # Use asyncio.run() which properly manages the event loop
+    # This replaces the deprecated get_event_loop pattern
+    return asyncio.run(code_generator(state))
 
 
 async def code_generator(state: AgentState) -> AgentState:
@@ -104,20 +91,58 @@ async def code_generator(state: AgentState) -> AgentState:
             ),
         }
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    language_prompts.get(
-                        state["query"].code_language,
-                        "Generate well-structured code.",
-                    ),
-                ),
-                ("human", "Task: {input}"),
-            ]
+        # Check if this is an update query with previous content
+        is_update = (
+            hasattr(state["query"], "action") 
+            and state["query"].action == QueryAction.UPDATE
+            and hasattr(state["query"], "previous_content")
+            and state["query"].previous_content
         )
-        chain = prompt | llm
-        code_response = chain.invoke({"input": state["query"].content})
+
+        if is_update:
+            # Modify prompt for update queries
+            system_prompt = language_prompts.get(
+                state["query"].code_language,
+                "Update the code based on the request.",
+            )
+            system_prompt += (
+                "\n\nThis is an update request. You will be provided with the existing code and a request to modify it.\n"
+                "When updating the code:\n"
+                "1. Keep the overall structure and functionality intact\n"
+                "2. Make only the changes requested in the update request\n"
+                "3. Return the entire updated code, not just the changed parts\n"
+                "4. Maintain consistent style with the original code\n"
+                "5. Ensure the updated code is complete and functional\n"
+            )
+            
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_prompt),
+                    ("human", "Original code:\n```\n{previous_code}\n```\n\nUpdate request: {input}"),
+                ]
+            )
+            chain = prompt | llm
+            code_response = chain.invoke({
+                "previous_code": state["query"].previous_content,
+                "input": state["query"].content
+            })
+        else:
+            # Standard prompt for new code generation
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        language_prompts.get(
+                            state["query"].code_language,
+                            "Generate well-structured code.",
+                        ),
+                    ),
+                    ("human", "Task: {input}"),
+                ]
+            )
+            chain = prompt | llm
+            code_response = chain.invoke({"input": state["query"].content})
+            
         # Log the raw response
         logger.debug(f"Raw LLM Response: {code_response}")
         logger.info(f"Raw LLM Response Content: {code_response.content}")
@@ -183,6 +208,47 @@ async def code_generator(state: AgentState) -> AgentState:
         state["context"]["generated_code"] = pure_code
         state["context"]["code_explanation"] = code_explanation
         state["context"]["code_generation_completed"] = True
+        
+        # Store metadata for retrieval later
+        state["context"]["generation_metadata"] = {
+            "generator_type": "code",
+            "code_language": state["query"].code_language.value if state["query"].code_language else None,
+            "is_update": is_update,
+            "file_identifier": state["query"].file_identifier if hasattr(state["query"], "file_identifier") else None
+        }            # If we have a file identifier, save the content for later retrieval
+        if hasattr(state["query"], "file_identifier") and state["query"].file_identifier:
+            from ..nodes.content_retriever import save_generated_content
+            try:
+                metadata = {
+                    "generator_type": "code",
+                    "code_language": state["query"].code_language.value if state["query"].code_language else None,
+                    "timestamp": import_time.time(),
+                    "query": state["query"].content
+                }
+                
+                # Check if this is an update query
+                is_update = (
+                    hasattr(state["query"], "action") 
+                    and state["query"].action == QueryAction.UPDATE
+                )
+                
+                # Include previous content metadata if available for updates
+                if is_update and "context" in state and "previous_content_metadata" in state["context"]:
+                    prev_metadata = state["context"]["previous_content_metadata"]
+                    # Preserve important metadata fields that shouldn't change between versions
+                    for key, value in prev_metadata.items():
+                        if key not in ["timestamp", "query"] and key not in metadata:
+                            metadata[key] = value
+                
+                save_generated_content(
+                    state["query"].file_identifier, 
+                    pure_code,
+                    metadata,
+                    is_update=is_update
+                )
+            except Exception as e:
+                logger.error(f"Error saving generated content: {str(e)}")
+        
         logger.info(f"Code generation completed for {state['query'].code_language}")
     except Exception as e:
         logger.error(f"Error in code generation: {str(e)}")

@@ -1,9 +1,10 @@
 """Document generator node for workflow."""
 
 import logging
+import time as import_time
 from langchain_openai import ChatOpenAI  # Updated import
 from langchain_core.prompts import ChatPromptTemplate
-from app.core.types import ComplexQuery, DocumentFormat
+from app.core.types import ComplexQuery, DocumentFormat, QueryAction
 from app.core.config import get_settings
 from app.core.types import AgentState
 from app.core.utils import validate_markdown_syntax
@@ -18,23 +19,9 @@ def sync_document_generator(state: AgentState) -> AgentState:
     """
     import asyncio
 
-    try:
-        # Try to get the existing loop
-        loop = asyncio.get_event_loop()
-        should_close_loop = False
-    except RuntimeError:
-        # Create a new loop if none exists
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        should_close_loop = True
-
-    try:
-        # Run the async document generator
-        return loop.run_until_complete(document_generator(state))
-    finally:
-        # Only close the loop if we created it
-        if should_close_loop:
-            loop.close()
+    # Use asyncio.run() which properly manages the event loop
+    # This replaces the deprecated get_event_loop pattern
+    return asyncio.run(document_generator(state))
 
 
 async def document_generator(state: AgentState) -> AgentState:
@@ -88,20 +75,58 @@ async def document_generator(state: AgentState) -> AgentState:
             ),
         }
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    format_prompts.get(
-                        state["query"].document_format,
-                        "Generate well-structured content.",
-                    ),
-                ),
-                ("human", "Task: {input}"),
-            ]
+        # Check if this is an update query with previous content
+        is_update = (
+            hasattr(state["query"], "action") 
+            and state["query"].action == QueryAction.UPDATE
+            and hasattr(state["query"], "previous_content")
+            and state["query"].previous_content
         )
-        chain = prompt | llm
-        doc_response = chain.invoke({"input": state["query"].content})
+
+        if is_update:
+            # Modify prompt for update queries
+            system_prompt = format_prompts.get(
+                state["query"].document_format,
+                "Update the document based on the request.",
+            )
+            system_prompt += (
+                "\n\nThis is an update request. You will be provided with the existing document and a request to modify it.\n"
+                "When updating the document:\n"
+                "1. Keep the overall structure and organization intact\n"
+                "2. Make only the changes requested in the update request\n"
+                "3. Return the entire updated document, not just the changed parts\n"
+                "4. Maintain consistent style with the original document\n"
+                "5. Ensure the updated document is complete and coherent\n"
+            )
+            
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_prompt),
+                    ("human", "Original document:\n```\n{previous_document}\n```\n\nUpdate request: {input}"),
+                ]
+            )
+            chain = prompt | llm
+            doc_response = chain.invoke({
+                "previous_document": state["query"].previous_content,
+                "input": state["query"].content
+            })
+        else:
+            # Standard prompt for new document generation
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        format_prompts.get(
+                            state["query"].document_format,
+                            "Generate well-structured content.",
+                        ),
+                    ),
+                    ("human", "Task: {input}"),
+                ]
+            )
+            chain = prompt | llm
+            doc_response = chain.invoke({"input": state["query"].content})
+            
         # Log the raw response
         logger.debug(f"Raw LLM Response: {doc_response}")
         logger.info(f"Raw LLM Response Content: {doc_response.content}")
@@ -161,6 +186,47 @@ async def document_generator(state: AgentState) -> AgentState:
         state["context"]["generated_document"] = pure_document
         state["context"]["document_explanation"] = document_explanation
         state["context"]["document_generation_completed"] = True
+        
+        # Store metadata for retrieval later
+        state["context"]["generation_metadata"] = {
+            "generator_type": "document",
+            "document_format": state["query"].document_format.value if state["query"].document_format else None,
+            "is_update": is_update,
+            "file_identifier": state["query"].file_identifier if hasattr(state["query"], "file_identifier") else None
+        }            # If we have a file identifier, save the content for later retrieval
+        if hasattr(state["query"], "file_identifier") and state["query"].file_identifier:
+            from ..nodes.content_retriever import save_generated_content
+            try:
+                metadata = {
+                    "generator_type": "document",
+                    "document_format": state["query"].document_format.value if state["query"].document_format else None,
+                    "timestamp": import_time.time(),
+                    "query": state["query"].content
+                }
+                
+                # Check if this is an update query
+                is_update = (
+                    hasattr(state["query"], "action") 
+                    and state["query"].action == QueryAction.UPDATE
+                )
+                
+                # Include previous content metadata if available for updates
+                if is_update and "context" in state and "previous_content_metadata" in state["context"]:
+                    prev_metadata = state["context"]["previous_content_metadata"]
+                    # Preserve important metadata fields that shouldn't change between versions
+                    for key, value in prev_metadata.items():
+                        if key not in ["timestamp", "query"] and key not in metadata:
+                            metadata[key] = value
+                
+                save_generated_content(
+                    state["query"].file_identifier, 
+                    pure_document,
+                    metadata,
+                    is_update=is_update
+                )
+            except Exception as e:
+                logger.error(f"Error saving generated content: {str(e)}")
+        
         logger.info(
             f"Document generation completed for {state['query'].document_format}"
         )

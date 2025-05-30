@@ -105,15 +105,13 @@ def clean_generated_files():
             file.unlink()
 
 
-def test_cpp_detection(client: OrchestratorClient) -> Tuple[bool, Optional[str]]:
+def test_cpp_detection(client: OrchestratorClient):
     """Test C++ code detection and proper file extension handling"""
     print_header("Testing C++ Detection and File Extension")
 
     # Create a chat session
     chat_id = client.create_chat()
-    if not chat_id:
-        print_error("Failed to create chat session")
-        return False, None
+    assert chat_id, "Failed to create chat session"
 
     # Create a message that specifically requests C++ code
     message = "Generate a C++ program that implements a Shape class hierarchy with Circle and Rectangle subclasses."
@@ -176,20 +174,14 @@ def test_cpp_detection(client: OrchestratorClient) -> Tuple[bool, Optional[str]]
         ]
         is_cpp = any(indicator in content for indicator in cpp_indicators)
 
-        if is_cpp and file_ext == ".cpp":
+        if is_cpp:
+            assert file_ext == ".cpp", f"C++ code detected but saved with incorrect extension: {file_ext}"
             print_success("✓ C++ code correctly detected and saved with .cpp extension")
-            return True, saved_file_path
-        elif is_cpp and file_ext != ".cpp":
-            print_error(
-                f"✗ C++ code detected but saved with incorrect extension: {file_ext}"
-            )
-            return False, saved_file_path
-        elif not is_cpp:
-            print_error("✗ Generated content does not appear to be C++ code")
-            return False, saved_file_path
+            return saved_file_path
+        else:
+            assert False, "Generated content does not appear to be C++ code"
     else:
-        print_error("✗ Could not find saved file path")
-        return False, None
+        assert False, "Could not find saved file path"
 
 
 def test_cpp_content_manual(client: OrchestratorClient) -> bool:

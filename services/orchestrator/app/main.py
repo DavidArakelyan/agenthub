@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import json
 import sys
@@ -144,8 +144,8 @@ async def create_new_chat():
             "id": chat_id,
             "name": "New Chat",
             "messages": [],
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         return {"success": True, "data": {"chatId": chat_id}}
     except Exception as e:
@@ -253,7 +253,7 @@ async def send_message(
                 id=str(uuid.uuid4()),
                 text=message,
                 type="user",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 files=[f.filename for f in files] if files else None,
             )
             chats[chat_id]["messages"].append(chat_message)
@@ -263,12 +263,12 @@ async def send_message(
                 id=str(uuid.uuid4()),
                 text=response_message,
                 type="reply",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
             )
             chats[chat_id]["messages"].append(response_chat_message)
 
             # Update chat metadata
-            chats[chat_id]["updated_at"] = datetime.utcnow().isoformat()
+            chats[chat_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
 
             return {
                 "success": True,
@@ -370,7 +370,7 @@ async def upload_document(
             "path": str(file_path),
             "content": content.decode(),
             "metadata": doc_metadata,
-            "uploaded_at": datetime.utcnow().isoformat(),
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
         }
 
         document_response = DocumentResponse(
@@ -460,7 +460,7 @@ async def web_search(query: str = Query(...)):
                 }
             ],
             query=query,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
         
         return {
@@ -503,7 +503,7 @@ async def save_content(request: SaveContentRequest):
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Construct file path with timestamp to prevent overwrites
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         file_path = save_dir / f"{timestamp}_{request.filename}"
 
         # Write content to file

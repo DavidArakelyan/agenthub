@@ -4,7 +4,7 @@ import logging
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
-from app.core.types import ComplexQuery, GeneratorType
+from app.core.types import ComplexQuery, GeneratorType, QueryAction
 from app.core.config import get_settings
 from app.core.types import AgentState
 
@@ -28,38 +28,79 @@ def response_generator(state: AgentState) -> AgentState:
             else GeneratorType.NONE
         )
 
+        # Check if this is an update query
+        is_update = (
+            isinstance(state["query"], ComplexQuery)
+            and hasattr(state["query"], "action") 
+            and state["query"].action == getattr(state["query"], "UPDATE", "update")
+        )
+
         if generation_type == GeneratorType.CODE:
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    (
-                        "system",
-                        "You are a programming assistant providing context for generated code.\n"
-                        "For the code you're describing:\n"
-                        "1. Explain the key components and their purpose\n"
-                        "2. Highlight any important design patterns or techniques used\n"
-                        "3. Note any assumptions or requirements\n"
-                        "4. Suggest potential improvements or alternatives\n"
-                        "5. Include any relevant usage examples\n",
-                    ),
-                    ("human", "Context: {context}\nDescribe the generated solution."),
-                ]
-            )
+            if is_update:
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            "You are a programming assistant providing context for updated code.\n"
+                            "For the code update you're describing:\n"
+                            "1. Summarize what changes were made to the original code\n"
+                            "2. Explain why these changes were necessary or requested\n"
+                            "3. Highlight any important new functionality or improvements\n"
+                            "4. Note any changes in usage or behavior\n"
+                            "5. Suggest any further improvements that could be made\n",
+                        ),
+                        ("human", "Context: {context}\nDescribe the updates made to the code."),
+                    ]
+                )
+            else:
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            "You are a programming assistant providing context for generated code.\n"
+                            "For the code you're describing:\n"
+                            "1. Explain the key components and their purpose\n"
+                            "2. Highlight any important design patterns or techniques used\n"
+                            "3. Note any assumptions or requirements\n"
+                            "4. Suggest potential improvements or alternatives\n"
+                            "5. Include any relevant usage examples\n",
+                        ),
+                        ("human", "Context: {context}\nDescribe the generated solution."),
+                    ]
+                )
         elif generation_type == GeneratorType.DOCUMENT:
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    (
-                        "system",
-                        "You are a documentation assistant providing context for generated content.\n"
-                        "For the document you're describing:\n"
-                        "1. Summarize the main sections and their purpose\n"
-                        "2. Explain the document structure and organization\n"
-                        "3. Highlight key information or takeaways\n"
-                        "4. Note any formatting or style conventions used\n"
-                        "5. Suggest how to best use or navigate the document\n",
-                    ),
-                    ("human", "Context: {context}\nDescribe the generated content."),
-                ]
-            )
+            if is_update:
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            "You are a documentation assistant providing context for updated content.\n"
+                            "For the document update you're describing:\n"
+                            "1. Summarize what changes were made to the original document\n"
+                            "2. Explain why these changes were necessary or requested\n"
+                            "3. Highlight any new sections or important additions\n"
+                            "4. Note any changes in structure or organization\n"
+                            "5. Suggest any further improvements that could be made\n",
+                        ),
+                        ("human", "Context: {context}\nDescribe the updates made to the document."),
+                    ]
+                )
+            else:
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            "You are a documentation assistant providing context for generated content.\n"
+                            "For the document you're describing:\n"
+                            "1. Summarize the main sections and their purpose\n"
+                            "2. Explain the document structure and organization\n"
+                            "3. Highlight key information or takeaways\n"
+                            "4. Note any formatting or style conventions used\n"
+                            "5. Suggest how to best use or navigate the document\n",
+                        ),
+                        ("human", "Context: {context}\nDescribe the generated content."),
+                    ]
+                )
         else:
             prompt = ChatPromptTemplate.from_messages(
                 [
@@ -97,6 +138,12 @@ def response_generator(state: AgentState) -> AgentState:
                 code_explanation = state["context"].get("code_explanation", "")
                 if code_explanation:
                     state["context"]["explanation"] = code_explanation
+                    
+                # For update queries, include information about the update
+                if is_update:
+                    state["context"]["is_update"] = True
+                    state["context"]["file_identifier"] = state["query"].file_identifier
+                    state["context"]["update_request"] = state["query"].content
 
             elif state["query"].generator_type == GeneratorType.DOCUMENT:
                 # Store only the pure generated document without explanatory content
@@ -115,6 +162,12 @@ def response_generator(state: AgentState) -> AgentState:
                 document_explanation = state["context"].get("document_explanation", "")
                 if document_explanation:
                     state["context"]["explanation"] = document_explanation
+                    
+                # For update queries, include information about the update
+                if is_update:
+                    state["context"]["is_update"] = True
+                    state["context"]["file_identifier"] = state["query"].file_identifier
+                    state["context"]["update_request"] = state["query"].content
 
         chain = prompt | llm
         # Always pass both query and context

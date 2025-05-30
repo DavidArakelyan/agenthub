@@ -33,6 +33,11 @@ The service first classifies queries into two categories:
    - Include additional context (attachments)
    - Require specialized processing
 
+Each complex query is further classified by action:
+
+- **New Generation**: Create fresh content based on the user's request
+- **Update**: Modify previously generated content, using it as context
+
 ### Workflow Components
 
 1. **Query Classifier**
@@ -40,8 +45,17 @@ The service first classifies queries into two categories:
    - Determines query type (simple/complex)
    - Identifies required processing steps
    - Returns structured classification with processing flags
+   - Detects if the query is an update request
 
-2. **Web Searcher** (Conditional)
+2. **Content Retriever** (Conditional)
+   - Activated for update queries
+   - Retrieves previously generated content 
+   - Provides context for update operations
+   - Uses fuzzy matching to find content by identifier
+   - Preserves metadata across generations
+   - Maintains timestamps and query history
+
+3. **Web Searcher** (Conditional)
    - Activated for queries needing recent information
    - Performs web searches based on task requirements
    - Adds search results to the context
@@ -91,13 +105,16 @@ The workflow follows a dynamic routing pattern:
        "needs_web_search": boolean,
        "needs_document_processing": boolean,
        "generation_type": "code" | "document" | "none",
-       "target_format": "cpp" | "py" | "java" | "txt" | "doc" | "pdf" | "none"
+       "target_format": "cpp" | "py" | "java" | "txt" | "doc" | "pdf" | "none",
+       "action": "new" | "update",
+       "file_identifier": string or null
      }
      ```
 
 2. **Conditional Routing**:
    - Simple queries → directly to Response Generator
    - Complex queries → appropriate processor(s):
+     - Update queries → Content Retriever
      - Recent info needed → Web Searcher
      - Context provided → Document Processor
      - Code needed → Code Generator
@@ -155,6 +172,21 @@ The service includes a sophisticated content saving mechanism that:
    - And others based on content analysis
 4. **Handles Multiple Formats** - Supports various programming languages and document formats
 
+### Update Query Workflow
+
+The service supports updating previously generated content through a specialized update workflow:
+
+1. **Update Detection** - The Query Classifier detects when a user is requesting changes to previously generated content
+2. **Content Retrieval** - The Content Retriever fetches the previous content and its metadata
+3. **Metadata Preservation** - Important metadata is preserved between generations:
+   - Creation timestamp is maintained
+   - Query history is tracked
+   - Language/format information is preserved
+4. **Contextual Generation** - Content generators use the previous content as context for the update
+5. **File Identifier** - The same file identifier is used for both the original and updated content, ensuring consistency
+
+This update workflow allows users to iteratively refine generated content while maintaining its history and metadata.
+
 ### Service Configuration
 - `ENVIRONMENT`: Service environment (default: "development")
 - `DEBUG`: Debug mode flag (default: false)
@@ -196,7 +228,13 @@ The service includes several testing scripts:
    ```
    Runs a full suite of tests for all core functionality.
 
-2. **Specialized Tests**:
+2. **Update Query Tests**:
+   ```bash
+   ./scripts/run_update_tests.sh
+   ```
+   Tests the update query functionality, including content retrieval and updates.
+
+3. **Specialized Tests**:
    ```bash
    # Test pure content extraction
    ./scripts/run_test_pure_content.sh

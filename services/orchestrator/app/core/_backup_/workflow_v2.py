@@ -8,13 +8,12 @@ from langchain_core.messages import HumanMessage
 import logging
 
 from app.core.config import get_settings
-from app.core.types import SimpleQuery, ComplexQuery, GeneratorType, QueryAction
+from app.core.types import SimpleQuery, ComplexQuery, GeneratorType
 from app.core.types import AgentState
 from app.core.nodes.web_searcher import web_searcher
 from app.core.nodes.document_processor import document_processor
-from app.core.nodes.code_generator import sync_code_generator
-from app.core.nodes.document_generator import sync_document_generator
-from app.core.nodes.content_retriever import content_retriever
+from app.core.nodes.code_generator import code_generator
+from app.core.nodes.document_generator import document_generator
 from app.core.nodes import (
     query_type_classifier,
     generator_type_classifier,
@@ -82,17 +81,8 @@ def create_agent_workflow() -> Graph:
 
         def query_type_router_func(s):
             if isinstance((s["query"]), ComplexQuery):
-                # Route to content retriever for update queries
-                if (hasattr(s["query"], "action") and 
-                    s["query"].action == QueryAction.UPDATE and 
-                    s["query"].file_identifier):
-                    return "content_retriever"
                 return "generator_type_classifier"
             return "response_generator"
-
-        def content_retriever_router_func(s):
-            # After content retrieval, go to the generator classifier
-            return "generator_type_classifier"
 
         def generation_type_router_func(s):
             if s["query"].generator_type == GeneratorType.CODE:
@@ -100,22 +90,20 @@ def create_agent_workflow() -> Graph:
             elif s["query"].generator_type == GeneratorType.DOCUMENT:
                 return "format_classifier"
             return "response_generator"
-            
+
         # Add nodes
         workflow.add_node("query_type_classifier", query_type_classifier)
-        workflow.add_node("content_retriever", content_retriever)
         workflow.add_node("generator_type_classifier", generator_type_classifier)
         workflow.add_node("language_classifier", language_classifier)
         workflow.add_node("format_classifier", format_classifier)
         workflow.add_node("web_searcher", web_searcher)
         workflow.add_node("document_processor", document_processor)
-        workflow.add_node("code_generator", sync_code_generator)
-        workflow.add_node("document_generator", sync_document_generator)
+        workflow.add_node("code_generator", code_generator)
+        workflow.add_node("document_generator", document_generator)
         workflow.add_node("response_generator", response_generator)
 
         # Add conditional edges
         workflow.add_conditional_edges("query_type_classifier", query_type_router_func)
-        workflow.add_edge("content_retriever", "generator_type_classifier")
         workflow.add_conditional_edges(
             "generator_type_classifier", generation_type_router_func
         )
@@ -177,11 +165,28 @@ def run_workflow(state: AgentState) -> Dict:
     """Run the workflow synchronously by wrapping the async implementation."""
     import asyncio
 
-    logger.info("Running workflow synchronously (via async wrapper)...")
     try:
-        # Use asyncio.run() which properly manages the event loop
-        # This replaces the deprecated get_event_loop pattern
-        return asyncio.run(run_workflow_async(state))
+        logger.info("Running workflow synchronously (via async wrapper)...")
+
+        # Get-or-Create Pattern for event loop
+        try:
+            loop = asyncio.get_event_loop()
+            should_close_loop = False
+        except RuntimeError:
+            # Create a new loop if none exists
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            should_close_loop = True
+
+        try:
+            # Run the async workflow function
+            result = loop.run_until_complete(run_workflow_async(state))
+            return result
+        finally:
+            # Only close the loop if we created it
+            if should_close_loop:
+                loop.close()
+
     except Exception as e:
         logger.error(f"Error running workflow synchronously: {str(e)}")
         raise
