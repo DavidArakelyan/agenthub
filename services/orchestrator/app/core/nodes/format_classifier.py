@@ -22,7 +22,7 @@ def format_classifier(state: AgentState) -> AgentState:
         return state
 
     llm = ChatOpenAI(
-        temperature=settings.main_model_temperature,
+        #temperature=settings.main_model_temperature,
         model_name=settings.main_model_name,
         openai_api_key=settings.openai_api_key,
     )

@@ -192,8 +192,6 @@ async def send_message(
 ):
     """Send a message to the chat."""
     try:
-        # Use the debug_break function to add a breakpoint here
-        debug_break()
 
         # Validate request
         request_data = MessageRequest(chat_id=chat_id, message=message)  # noqa: F841

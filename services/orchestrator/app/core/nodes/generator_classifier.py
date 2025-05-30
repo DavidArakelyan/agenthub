@@ -25,7 +25,7 @@ def generator_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
         return state
 
     llm = ChatOpenAI(
-        temperature=settings.main_model_temperature,
+        #temperature=settings.main_model_temperature,
         model_name=settings.main_model_name,
         openai_api_key=settings.openai_api_key,
     )

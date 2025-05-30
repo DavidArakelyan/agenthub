@@ -20,7 +20,7 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
 
     # Use settings from config
     llm = ChatOpenAI(
-        temperature=settings.main_model_temperature,
+        #temperature=settings.main_model_temperature,
         model_name=settings.main_model_name,
         openai_api_key=settings.openai_api_key,
     )

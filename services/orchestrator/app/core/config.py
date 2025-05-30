@@ -108,12 +108,12 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Model Configurations
-    # main_model_name: str = "o4-mini"
-    main_model_name: str = "gpt-4.1"
-    main_model_temperature: float = 0.7
+    main_model_name: str = "o4-mini"
+    #main_model_name: str = "gpt-4.1"
+    #main_model_temperature: float = 0.7
 
     # Code generation model
-    # main_model_name: str = "o3"
+    #code_model_name: str = "o3"
     code_model_name: str = "gpt-4.1"
     code_model_temperature: float = 0.2
 
