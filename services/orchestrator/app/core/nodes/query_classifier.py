@@ -162,7 +162,7 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
                     "4. Any other identifying information that could help match this to existing content\n\n"
                     "If you can't determine a specific identifier with high confidence, assume it's about the most recently generated content.\n"
                     "Based on the query, generate a possible file identifier that would match existing content.\n"
-                    'Return JSON: {"possible_file_identifier": string}'
+                    'Return JSON: {{"possible_file_identifier": string}}'
                 )
                 find_content_chain = ChatPromptTemplate.from_messages(
                     [("system", find_content_prompt), ("human", "{query}")]
@@ -218,7 +218,7 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
             "filesystem-safe filename (no spaces, special characters) that represents the content. "
             "Do not include file extensions. Use only lowercase letters, numbers, and underscores. "
             "Keep it concise (max 30 chars) but descriptive."
-            'Return JSON: {"file_identifier": string}'
+            'Return JSON: {{"file_identifier": string}}'
         )
         file_gen_prompt = ChatPromptTemplate.from_messages(
             [("system", file_gen_system_prompt), ("human", "{query}")]
