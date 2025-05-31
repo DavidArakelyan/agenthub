@@ -484,7 +484,8 @@ textarea:focus {
     font-size: 14px;
     line-height: 1.5;
     background-color: #282c34;
-    color: #abb2bf;
+    /* color: #abb2bf; */
+    /* Allow Prism theme or language-styles.css to control text color */
     position: relative;
     transition: all 0.2s ease;
     border-radius: 0 0 8px 8px;

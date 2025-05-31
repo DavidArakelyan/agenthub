@@ -1,4 +1,4 @@
-/* Additional code block styling */
+/* Basic code block styling */
 
 /* Tab size consistency */
 .canvas-content code {
@@ -6,13 +6,13 @@
     -moz-tab-size: 4;
 }
 
-/* Improved code block accessibility */
+/* Basic code block accessibility */
 .code-action-btn:focus {
     outline: 2px solid #10a37f;
     outline-offset: 2px;
 }
 
-/* More visible copy feedback */
+/* Copy feedback */
 .copy-success {
     position: fixed;
     bottom: 20px;
@@ -48,40 +48,56 @@
     }
 }
 
-/* Better language recognition indicator */
-.language-badge {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    font-size: 12px;
-    padding: 3px 6px;
+/* Basic code block scrolling */
+.canvas-content pre {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.canvas-content pre::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+
+.canvas-content pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.canvas-content pre::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
     border-radius: 3px;
-    background-color: rgba(0, 0, 0, 0.1);
-    color: #333;
 }
 
-/* Python-specific syntax improvements */
-.python-indentation {
-    display: inline-block;
-    width: 1em;
-    height: 1em;
-    opacity: 0.15;
-    border-left: 1px solid currentColor;
+.canvas-content pre::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
-/* Token improvements for better visibility */
-.token.important {
-    font-weight: bold;
+/* Basic token styling - rely on Prism defaults */
+
+/* Simple language badge styling */
+.language-badge {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: monospace;
+    opacity: 0.8;
 }
 
-.token.entity {
-    cursor: help;
+pre:hover .language-badge {
+    opacity: 0.3;
 }
 
-/* Additional language detection feedback */
-.language-detected {
-    font-style: italic;
-    color: #10a37f;
-    margin-left: 10px;
-    font-size: 0.8em;
+/* Basic code block scrolling */
+.canvas-content pre {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
+
+/* Use Prism's default styling for tokens */

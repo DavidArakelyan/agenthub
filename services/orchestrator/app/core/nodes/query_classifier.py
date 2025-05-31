@@ -137,7 +137,7 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
         )
         update_chain = update_prompt | llm
         update_response = update_chain.invoke({"query": query_content})
-        
+    
         # Parse the update classification
         update_result = json.loads(update_response.content)
         is_update_query = update_result.get("is_update", False)
@@ -162,7 +162,7 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
                     "4. Any other identifying information that could help match this to existing content\n\n"
                     "If you can't determine a specific identifier with high confidence, assume it's about the most recently generated content.\n"
                     "Based on the query, generate a possible file identifier that would match existing content.\n"
-                    'Return JSON: {{"possible_file_identifier": string}}'
+                    'Return JSON: {"possible_file_identifier": string}' #deliberately wrong to not generate a speculative identifier
                 )
                 find_content_chain = ChatPromptTemplate.from_messages(
                     [("system", find_content_prompt), ("human", "{query}")]

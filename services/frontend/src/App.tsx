@@ -1,46 +1,39 @@
 import React, { useState, KeyboardEvent, useRef, useEffect, useCallback } from 'react';
-import { apiClient, ChatMessage, ApiClient } from './services/api';
+import { apiClient, ChatMessage } from './services/api';
+
+// Import Prism core components first as they must be loaded before the main Prism object
+import 'prismjs/components/prism-core';
+import 'prismjs/components/prism-clike';
+// Then import the main Prism object
 import Prism from 'prismjs';
+
+// Then import other language components
+import 'prismjs/components/prism-javascript'; // JS depends on clike
+import 'prismjs/components/prism-c'; // Import C first as C++ depends on it
+import 'prismjs/components/prism-cpp'; // C++ depends on C
+import 'prismjs/components/prism-python'; // Add Python language support
+import 'prismjs/components/prism-java'; // Add Java language support
+
+// Add diagnostic logging
+console.log('Prism loaded:', !!Prism);
+console.log('Languages available:', Object.keys(Prism.languages));
+console.log('C language available:', !!Prism.languages.c);
+console.log('C++ language available:', !!Prism.languages.cpp);
+console.log('Python language available:', !!Prism.languages.python);
+console.log('Java language available:', !!Prism.languages.java);
+console.log('JavaScript language available:', !!Prism.languages.javascript);
+
 // Markdown support
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 // FontAwesome imports
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileCode, faFileAlt, faFile, faCopy, faExpand, faCompress } from '@fortawesome/free-solid-svg-icons';
-// Core prismjs styles
+import { faFileCode, faFileAlt, faFile, faCopy, faExpand } from '@fortawesome/free-solid-svg-icons';
+// Prism styling
 import 'prismjs/themes/prism-tomorrow.css';
-// Core prism
-import 'prismjs/components/prism-core';
-// Basic languages
-import 'prismjs/components/prism-clike';
-// Individual languages
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-yaml';
-// Additional languages
-import 'prismjs/components/prism-csharp';
-import 'prismjs/components/prism-ruby';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-swift';
-import 'prismjs/components/prism-php';
-import 'prismjs/components/prism-kotlin';
-import 'prismjs/components/prism-scala';
-import 'prismjs/components/prism-ini';
-import 'prismjs/components/prism-powershell';
-import './App.css';
 import './language-styles.css'; // Import additional language styling
 import './code-styling.css'; // Import code-specific styling improvements
+import './App.css';
 
 interface AttachedFile {
     file: File;
@@ -60,8 +53,6 @@ interface GeneratedContent {
     format: string;
     content: string;
 }
-
-const apiClientInstance = new ApiClient();
 
 // Helper function to map content format to Prism language class
 const getLanguageClass = (format: string | undefined, type: string | undefined): string => {
@@ -86,40 +77,78 @@ const getLanguageClass = (format: string | undefined, type: string | undefined):
         'cpp': 'cpp',
         'c': 'c',
         'cs': 'csharp',
+        'csharp': 'csharp',
         'rb': 'ruby',
+        'ruby': 'ruby',
         'go': 'go',
         'rs': 'rust',
+        'rust': 'rust',
         'swift': 'swift',
         'php': 'php',
         'kt': 'kotlin',
+        'kotlin': 'kotlin',
         'scala': 'scala',
+        'dart': 'dart',
+        'elm': 'elm',
+        'haskell': 'haskell',
+        'hs': 'haskell',
+        'perl': 'perl',
+        'pl': 'perl',
+        'r': 'r',
+        'vb': 'vbnet',
+        'vbnet': 'vbnet',
+        'lisp': 'lisp',
+        'clj': 'clojure',
+        'clojure': 'clojure',
+        'groovy': 'groovy',
+        'fsharp': 'fsharp',
+        'fs': 'fsharp',
+        'tsx': 'tsx',
+        'jsx': 'jsx',
 
         // Markup & configuration
         'md': 'markdown',
+        'markdown': 'markdown',
         'html': 'markup',
         'xml': 'markup',
+        'svg': 'markup',
         'css': 'css',
+        'scss': 'scss',
+        'sass': 'sass',
+        'less': 'less',
         'json': 'json',
         'yaml': 'yaml',
         'yml': 'yaml',
         'toml': 'toml',
         'ini': 'ini',
+        'graphql': 'graphql',
+        'gql': 'graphql',
 
         // Shell scripts
         'sh': 'bash',
         'bash': 'bash',
         'zsh': 'bash',
         'ps1': 'powershell',
+        'powershell': 'powershell',
+        'bat': 'batch',
+        'cmd': 'batch',
 
         // Data formats
         'sql': 'sql',
+        'mysql': 'sql',
+        'pgsql': 'sql',
         'txt': 'text',
         'csv': 'text',
         'tsv': 'text',
+        'regex': 'regex',
 
         // Document formats 
         'doc': 'text',
         'pdf': 'text',
+        'tex': 'latex',
+        'latex': 'latex',
+        'diff': 'diff',
+        'patch': 'diff',
     };
 
     // If we have a type, use it to refine our language class decision
@@ -154,6 +183,44 @@ const getContentTypeIcon = (type: string | undefined) => {
     }
 };
 
+// Simple function to detect Python code based on patterns
+const detectPythonCode = (content: string): boolean => {
+    if (!content) return false;
+
+    // Simple detection for Python code (minimal patterns for basic detection)
+    const pythonPatterns = [
+        /\bdef\s+\w+\s*\(/,        // Function definitions
+        /\bimport\s+\w+/,          // Import statements
+        /^\s*if\s+.*:\s*$/m,       // If statements with colon
+    ];
+
+    // At least one pattern must match
+    return pythonPatterns.some(pattern => pattern.test(content));
+};
+
+// Simple function to detect language from code content
+const detectLanguage = (content: string): string | null => {
+    if (!content || content.trim().length < 20) return null;
+
+    // Simplified minimal language detection for basic code classification
+    // This is a fallback for when backend doesn't specify target_format
+    const patterns: { [key: string]: RegExp[] } = {
+        'js': [/\bfunction\s+\w+\s*\(/, /\bconst\s+\w+\s*=/],
+        'ts': [/:\s*\w+/, /interface\s+\w+/],
+        'py': [/\bdef\s+\w+\s*\(/, /\bimport\s+/],
+        'html': [/<\w+[^>]*>/, /<\/\w+>/] // Removed unnecessary escapes for < and >
+    };
+
+    // Simple pattern matching to find the most likely language
+    for (const [lang, langPatterns] of Object.entries(patterns)) {
+        if (langPatterns.some(pattern => pattern.test(content))) {
+            return lang;
+        }
+    }
+
+    return null;
+};
+
 function App() {
     const [chats, setChats] = useState<Chat[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -165,10 +232,22 @@ function App() {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [serverSaveEnabled, setServerSaveEnabled] = useState<{ [key: number]: boolean }>({});
-    const [canvasWidth, setCanvasWidth] = useState<number>(400); // Default width
+    const [canvasWidth, setCanvasWidth] = useState<number>(400);
     const [isResizing, setIsResizing] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const triggerSyntaxHighlighting = useCallback(() => {
+        console.log('Global triggerSyntaxHighlighting: Attempting Prism.highlightAll()');
+        setTimeout(() => {
+            try {
+                Prism.highlightAll();
+                console.log('Global triggerSyntaxHighlighting: Prism.highlightAll() executed.');
+            } catch (error) {
+                console.error('Error during global syntax highlighting:', error);
+            }
+        }, 100);
+    }, []);
 
     // Load chats from localStorage on initial render
     useEffect(() => {
@@ -199,6 +278,22 @@ function App() {
         localStorage.setItem('chats', JSON.stringify(chats));
     }, [chats]);
 
+    // useEffect for serverSaveEnabled state, depends only on canvas
+    useEffect(() => {
+        setServerSaveEnabled(prevServerSaveEnabled => {
+            const newServerSaveState = { ...prevServerSaveEnabled };
+            let changed = false;
+            canvas.forEach((_, index) => {
+                if (!(index in newServerSaveState)) {
+                    newServerSaveState[index] = true; // Default to checked (true)
+                    changed = true;
+                }
+            });
+            // Only update state if something actually changed to prevent unnecessary re-renders
+            return changed ? newServerSaveState : prevServerSaveEnabled;
+        });
+    }, [canvas]); // Only depends on canvas
+
     const loadChatHistory = async (chatId: string) => {
         try {
             const history = await apiClient.getChatHistory(chatId);
@@ -215,12 +310,11 @@ function App() {
 
     useEffect(() => {
         scrollToBottom();
-
         // Trigger syntax highlighting for code blocks in messages
         if (messages.length > 0) {
-            triggerSyntaxHighlighting();
+            triggerSyntaxHighlighting(); // Call the useCallback version
         }
-    }, [messages]);
+    }, [messages, triggerSyntaxHighlighting]);
 
     const generateChatName = (firstMessage: string) => {
         const maxLength = 30;
@@ -299,7 +393,6 @@ function App() {
                 timestamp: new Date().toISOString()
             };
 
-            // Update messages state
             const updatedMessages = [...messages, newMessage];
             setMessages(updatedMessages);
 
@@ -378,11 +471,9 @@ function App() {
                         console.log(`Setting format to ${detectedLanguage} based on content analysis`);
                     }
                 }
-
-                setCanvas([...canvas, normalizedContent]);
-
-                // Ensure syntax highlighting is applied
-                setTimeout(() => triggerSyntaxHighlighting(), 100);
+                // The useEffect hook observing 'canvas' will handle the highlighting.
+                // No direct call to triggerSyntaxHighlighting() here anymore.
+                setCanvas(prevCanvas => [...prevCanvas, normalizedContent]);
             }
 
             // Update chat in state
@@ -481,16 +572,6 @@ function App() {
         }
     };
 
-    useEffect(() => {
-        const newServerSaveState = { ...serverSaveEnabled };
-        canvas.forEach((_, index) => {
-            if (!(index in newServerSaveState)) {
-                newServerSaveState[index] = true; // Default to checked
-            }
-        });
-        setServerSaveEnabled(newServerSaveState);
-    }, [canvas, serverSaveEnabled]);
-
     const handleSaveCanvas = async (content: GeneratedContent, index: number) => {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -531,69 +612,55 @@ function App() {
         }
     };
 
-    // Initialize Prism highlighting after content updates
-    useEffect(() => {
-        // Force Prism to re-highlight everything when canvas changes
-        if (canvas.length > 0) {
-            // Give the DOM a chance to update before highlighting
-            setTimeout(() => {
-                try {
-                    console.log('Highlighting code with Prism.js');
-                    Prism.highlightAll();
-                    // Apply manual Python highlighting after Prism
-                    setTimeout(() => manuallyHighlightPython(), 200);
-                } catch (error) {
-                    console.error('Error while highlighting code:', error);
-                    // Fallback to manual highlighting
-                    manuallyHighlightPython();
-                }
-            }, 100); // Slightly longer timeout to ensure DOM is updated
-        }
-    }, [canvas]);
-
-    // Special handling for Python syntax highlighting
+    // useEffect for canvas changes (syntax highlighting)
     useEffect(() => {
         if (canvas.length > 0) {
-            // Check if we have any Python content
-            const hasPythonContent = canvas.some(content =>
-                content.format?.toLowerCase() === 'py' ||
-                content.format?.toLowerCase() === 'python'
-            );
+            const timerId = setTimeout(() => {
+                console.log('[Canvas Effect] Attempting Prism.highlightAll(). Current canvas length:', canvas.length);
 
-            if (hasPythonContent) {
-                console.log('Python content detected, ensuring proper highlighting');
-                // Multiple triggers with increasing delays to ensure highlighting works
-                // even if DOM updates are slow
-                setTimeout(() => Prism.highlightAll(), 100);
-                setTimeout(() => Prism.highlightAll(), 500);
-                setTimeout(() => Prism.highlightAll(), 1000);
-            }
-        }
-    }, [canvas]);
+                // More detailed diagnostics for C/C++ languages
+                if (Prism && Prism.languages) {
+                    console.log('Available Prism languages:', Object.keys(Prism.languages).join(', '));
+                    console.log('C language grammar:', Prism.languages.c ? 'Loaded' : 'Not loaded');
+                    console.log('C++ language grammar:', Prism.languages.cpp ? 'Loaded' : 'Not loaded');
+                    console.log('Python language grammar:', Prism.languages.python ? 'Loaded' : 'Not loaded');
+                    console.log('Java language grammar:', Prism.languages.java ? 'Loaded' : 'Not loaded');
 
-    // Function to manually trigger Prism highlighting
-    const triggerSyntaxHighlighting = () => {
-        console.log('Manually triggering syntax highlighting');
-        // Wait a bit for the DOM to update
-        setTimeout(() => {
-            try {
-                Prism.highlightAll();
-                // After Prism has done its work, apply our manual Python highlighting
-                setTimeout(() => manuallyHighlightPython(), 50);
-
-                // Also highlight any code blocks in Markdown messages
-                document.querySelectorAll('.message-text pre code').forEach((block) => {
-                    if (block.className.includes('language-')) {
-                        Prism.highlightElement(block);
+                    // Check for specific tokens in the C++ grammar to verify it's properly loaded
+                    if (Prism.languages.cpp) {
+                        console.log('C++ grammar keys:', Object.keys(Prism.languages.cpp).slice(0, 10).join(', ') + '...');
                     }
-                });
-            } catch (error) {
-                console.error('Error during syntax highlighting:', error);
-                // Fallback to manual Python highlighting if Prism fails
-                manuallyHighlightPython();
-            }
-        }, 100);
-    };
+
+                    // Check for specific tokens in the Python grammar to verify it's properly loaded
+                    if (Prism.languages.python) {
+                        console.log('Python grammar keys:', Object.keys(Prism.languages.python).slice(0, 10).join(', ') + '...');
+                    }
+
+                    // Check for specific tokens in the Java grammar to verify it's properly loaded
+                    if (Prism.languages.java) {
+                        console.log('Java grammar keys:', Object.keys(Prism.languages.java).slice(0, 10).join(', ') + '...');
+                    }
+
+                    // Log specific canvas content language classes
+                    canvas.forEach((content, idx) => {
+                        const langClass = getLanguageClass(content.format, content.type);
+                        console.log(`Canvas item ${idx} language class: ${langClass}, Prism has grammar: ${!!Prism.languages[langClass]}`);
+                    });
+                } else {
+                    console.log('[Canvas Effect] Prism or Prism.languages not available.');
+                }
+
+                try {
+                    Prism.highlightAll();
+                    console.log('[Canvas Effect] Prism.highlightAll() executed.');
+                } catch (e) {
+                    console.error('[Canvas Effect] Error during Prism.highlightAll():', e);
+                }
+            }, 200); // Increased delay slightly
+
+            return () => clearTimeout(timerId);
+        }
+    }, [canvas]); // Only depends on canvas
 
     // Function to toggle code block expansion
     const toggleCodeExpansion = (index: number) => {
@@ -631,37 +698,24 @@ function App() {
         );
     };
 
-    // Canvas resizing handlers
+    // Canvas resizing handlers - RESTORED
     const handleResizeMove = useCallback((e: MouseEvent) => {
         if (!isResizing) return;
-
-        // Calculate new width based on window width and mouse position
         const containerWidth = window.innerWidth;
-        // Calculate mouse position from right edge of screen
         const distanceFromRight = containerWidth - e.clientX;
-
-        // Min: 300px, Max: 50% of window width or 800px (whichever is smaller)
         const maxWidth = Math.min(containerWidth * 0.5, 800);
         const newWidth = Math.max(300, Math.min(maxWidth, distanceFromRight));
-
         setCanvasWidth(newWidth);
     }, [isResizing]);
 
     const handleResizeEnd = useCallback(() => {
         setIsResizing(false);
-
-        // Remove event listeners
         document.removeEventListener('mousemove', handleResizeMove);
         document.removeEventListener('mouseup', handleResizeEnd);
-
-        // Remove the resize class from body
         document.body.classList.remove('resizing');
-
-        // Save width preference to localStorage
         localStorage.setItem('canvasWidth', canvasWidth.toString());
-    }, [canvasWidth]);
+    }, [canvasWidth, handleResizeMove]); // Added handleResizeMove to deps
 
-    // Fix circular dependency between handleResizeMove and handleResizeEnd
     useEffect(() => {
         if (isResizing) {
             document.addEventListener('mousemove', handleResizeMove);
@@ -676,13 +730,9 @@ function App() {
     const handleResizeStart = (e: React.MouseEvent) => {
         e.preventDefault();
         setIsResizing(true);
-        // The actual event listeners are set in the useEffect above
-
-        // Add a resize class to the body to disable text selection during resize
         document.body.classList.add('resizing');
     };
 
-    // Clean up any remaining event listeners on component unmount
     useEffect(() => {
         return () => {
             document.body.classList.remove('resizing');
@@ -888,11 +938,11 @@ function App() {
                     <h2>Generated Content</h2>
                     {canvas.map((content, index) => (
                         <div key={index} className="canvas-content" onClick={() => {
+                            // It's generally better to trigger highlighting based on data changes (useEffect)
+                            // rather than click events on the whole canvas item,
+                            // but leaving as is for now if it serves a specific purpose.
+                            // Consider if this specific call is still needed given the useEffect [canvas]
                             triggerSyntaxHighlighting();
-                            // If it's Python content, ensure it gets special treatment
-                            if (content.format === 'py' || content.format === 'python') {
-                                setTimeout(() => manuallyHighlightPython(), 50);
-                            }
                         }}>
                             <div className="canvas-header">
                                 <span className={`content-type content-type-${content.type?.toLowerCase() || 'code'}`}>
@@ -904,7 +954,7 @@ function App() {
                                         <input
                                             type="checkbox"
                                             id={`server-save-${index}`}
-                                            checked={serverSaveEnabled[index]}
+                                            checked={serverSaveEnabled[index] || false} // Ensure controlled component with boolean
                                             onChange={(e) => setServerSaveEnabled(prev => ({
                                                 ...prev,
                                                 [index]: e.target.checked
@@ -921,6 +971,7 @@ function App() {
                                     </button>
                                 </div>
                             </div>
+                            {/* Use Prism for syntax highlighting */}
                             <pre className={`language-${getLanguageClass(content.format, content.type)}`}>
                                 <code className={`language-${getLanguageClass(content.format, content.type)}`}>
                                     {content.content}
@@ -960,173 +1011,5 @@ function App() {
         </div>
     );
 }
-
-// Function to manually highlight Python code in case Prism doesn't do it properly
-const manuallyHighlightPython = () => {
-    // Find all Python code blocks that haven't been highlighted yet
-    const pythonBlocks = document.querySelectorAll('code.language-python:not(.python-highlighted)');
-
-    if (pythonBlocks.length === 0) {
-        return; // No Python blocks found that need highlighting
-    }
-
-    console.log(`Found ${pythonBlocks.length} Python blocks to highlight manually`);
-
-    // Process each block
-    pythonBlocks.forEach((block, index) => {
-        try {
-            // Get the raw content
-            const content = block.textContent || '';
-
-            if (content.trim() === '') {
-                console.log(`Python block ${index} is empty, skipping`);
-                return;
-            }
-
-            console.log(`Manually highlighting Python block ${index}`);
-
-            // Use Prism's Python language definition if available
-            if (Prism.languages.python) {
-                // Highlight the code using Prism's Python grammar
-                const highlightedCode = Prism.highlight(
-                    content,
-                    Prism.languages.python,
-                    'python'
-                );
-
-                // Set the highlighted HTML
-                block.innerHTML = highlightedCode;
-
-                // Add custom CSS class to parent pre element for better styling
-                const preElement = block.closest('pre');
-                if (preElement) {
-                    preElement.classList.add('python-enhanced');
-                }
-
-                // Mark as processed
-                block.classList.add('python-highlighted');
-                console.log(`Successfully highlighted Python block ${index}`);
-            } else {
-                console.error('Python language definition not found in Prism');
-            }
-        } catch (err) {
-            console.error('Error during manual Python highlighting:', err);
-
-            // Fallback: Apply basic syntax highlighting for common Python elements
-            try {
-                // Get the raw content again for the fallback
-                const content = block.textContent || '';
-
-                // Simple regex-based highlighting for basic Python elements
-                let html = content
-                    .replace(/\b(def|class|import|from|as|if|else|elif|for|while|return|yield|try|except|finally|with|in|is|not|and|or|True|False|None)\b/g, '<span class="token keyword">$1</span>')
-                    .replace(/(?<!\w)(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="token string">$&</span>')
-                    .replace(/(#.*)$/gm, '<span class="token comment">$1</span>')
-                    .replace(/\b([0-9]+(?:\.[0-9]+)?)\b/g, '<span class="token number">$1</span>');
-
-                block.innerHTML = html;
-                block.classList.add('python-highlighted');
-                console.log(`Applied fallback highlighting for Python block ${index}`);
-            } catch (fallbackError) {
-                console.error('Fallback highlighting also failed:', fallbackError);
-            }
-        }
-    });
-
-    // Apply additional DOM-based styles for Python elements
-    document.querySelectorAll('.python-highlighted .token.keyword').forEach(keyword => {
-        keyword.classList.add('python-keyword');
-    });
-};
-
-// Function to detect Python code based on patterns
-const detectPythonCode = (content: string): boolean => {
-    if (!content) return false;
-
-    // Look for Python-specific patterns
-    const pythonPatterns = [
-        /\bdef\s+\w+\s*\(/,                    // Function definitions
-        /\bclass\s+\w+\s*[:\(]/,               // Class definitions
-        /\bimport\s+\w+/,                      // Import statements
-        /\bfrom\s+\w+\s+import/,               // From import statements
-        /^\s*if\s+.*:\s*$/m,                   // If statements with colon
-        /^\s*for\s+.*\s+in\s+.*:\s*$/m,        // For loops
-        /^\s*while\s+.*:\s*$/m,                // While loops
-        /\bprint\s*\(/,                        // Print function
-        /^\s*@\w+/m                            // Decorators
-    ];
-
-    // Check if at least 2 patterns match to reduce false positives
-    const matchCount = pythonPatterns.filter(pattern => pattern.test(content)).length;
-    return matchCount >= 2;
-};
-
-// Function to detect language from code content
-const detectLanguage = (content: string): string | null => {
-    if (!content || content.trim().length < 20) return null;
-
-    // Look for common language patterns
-    const patterns: { [key: string]: RegExp[] } = {
-        // JavaScript patterns
-        'js': [
-            /\bconst\s+\w+\s*=/,               // const declarations
-            /\blet\s+\w+\s*=/,                 // let declarations
-            /\bfunction\s+\w+\s*\(/,           // function declarations
-            /=>\s*{/,                          // Arrow functions
-            /\bdocument\.\w+/,                 // DOM manipulation
-            /\bconsole\.log\(/                 // console.log
-        ],
-
-        // TypeScript patterns
-        'ts': [
-            /:\s*\w+Type\b/,                  // Type annotations
-            /interface\s+\w+\s*{/,            // Interface declarations
-            /\w+<\w+>/,                       // Generics
-            /:\s*string\b/,                   // string type
-            /:\s*number\b/,                   // number type
-            /:\s*boolean\b/                   // boolean type
-        ],
-
-        // Python patterns
-        'py': [
-            /\bdef\s+\w+\s*\(/,               // Function definitions
-            /\bclass\s+\w+\s*[:\(]/,          // Class definitions
-            /\bimport\s+\w+/,                 // Import statements
-            /\bfrom\s+\w+\s+import/,          // From import statements
-            /^\s*if\s+.*:\s*$/m,              // If statements with colon
-            /^\s*for\s+.*\s+in\s+.*:\s*$/m    // For loops
-        ],
-
-        // Java patterns
-        'java': [
-            /\bpublic\s+class\s+\w+/,         // Class declarations
-            /\bpublic\s+(static\s+)?\w+\s+\w+\s*\(/,  // Method declarations
-            /\bSystem\.out\.println\(/,       // Print statements
-            /\bnew\s+\w+\s*\(/,               // Object instantiation
-            /\bprivate\s+\w+\s+\w+/           // Private fields
-        ]
-    };
-
-    // Check patterns for each language
-    const results: { [key: string]: number } = {};
-
-    for (const [lang, langPatterns] of Object.entries(patterns)) {
-        const matchCount = langPatterns.filter(pattern => pattern.test(content)).length;
-        results[lang] = matchCount;
-    }
-
-    // Find the language with the most matches
-    let bestMatch = null;
-    let maxMatches = 1; // Require at least 2 matches
-
-    for (const [lang, count] of Object.entries(results)) {
-        if (count > maxMatches) {
-            maxMatches = count;
-            bestMatch = lang;
-        }
-    }
-
-    return bestMatch;
-};
 
 export default App;

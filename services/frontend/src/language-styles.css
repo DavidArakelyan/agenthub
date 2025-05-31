@@ -1,143 +1,100 @@
-/* JavaScript/TypeScript styles */
-.language-javascript,
-.language-typescript {
-    background-color: #fff8e1 !important;
-    border-left: 4px solid #f7df1e !important;
-    /* JavaScript yellow */
-    padding-left: 1em !important;
-}
-
-.language-javascript .token.keyword,
-.language-typescript .token.keyword {
-    color: #d32f2f !important;
-    /* Red for keywords */
-    font-weight: bold !important;
-}
-
-.language-javascript .token.function,
-.language-typescript .token.function {
-    color: #0277bd !important;
-    /* Deep blue for functions */
-}
-
-.language-javascript .token.string,
-.language-typescript .token.string {
-    color: #388e3c !important;
-    /* Green for strings */
-}
-
-.language-javascript .token.comment,
-.language-typescript .token.comment {
-    color: #9e9e9e !important;
-    /* Light gray for comments */
-    font-style: italic !important;
-}
-
-.language-javascript .token.number,
-.language-typescript .token.number {
-    color: #ff6f00 !important;
-    /* Orange for numbers */
-}
-
-/* Java styles */
-.language-java {
-    background-color: #e8f5e9 !important;
-    border-left: 4px solid #f44336 !important;
-    /* Java red */
-    padding-left: 1em !important;
-}
-
-.language-java .token.keyword {
-    color: #0277bd !important;
-    /* Blue for keywords */
-    font-weight: bold !important;
-}
-
-.language-java .token.function {
-    color: #558b2f !important;
-    /* Green for functions */
-}
-
-.language-java .token.string {
-    color: #d81b60 !important;
-    /* Pink for strings */
-}
-
-.language-java .token.comment {
-    color: #9e9e9e !important;
-    /* Light gray for comments */
-    font-style: italic !important;
-}
-
-/* C# styles */
-.language-csharp {
-    background-color: #e3f2fd !important;
-    border-left: 4px solid #68217a !important;
-    /* C# purple */
-    padding-left: 1em !important;
-}
-
-.language-csharp .token.keyword {
-    color: #68217a !important;
-    /* Purple for keywords */
-    font-weight: bold !important;
-}
-
-.language-csharp .token.function {
-    color: #0277bd !important;
-    /* Blue for functions */
-}
-
-.language-csharp .token.string {
-    color: #c62828 !important;
-    /* Red for strings */
-}
-
-/* Markdown styles */
-.language-markdown {
+/* Basic code block styling */
+pre[class*="language-"] {
+    color: #333 !important;
+    /* Default dark text for light background */
     background-color: #f5f5f5 !important;
-    border-left: 4px solid #42a5f5 !important;
-    /* Blue for markdown */
+    border-left: 4px solid #10a37f !important;
+    /* Standard border color */
     padding-left: 1em !important;
+    margin: 0.5em 0;
+    overflow: auto;
 }
 
-.language-markdown .token.heading {
-    color: #0277bd !important;
-    /* Blue for headings */
-    font-weight: bold !important;
+/* Basic styling for tokens - use Prism defaults */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: slategray !important;
 }
 
-.language-markdown .token.list {
-    color: #7b1fa2 !important;
-    /* Purple for lists */
+.token.punctuation {
+    color: #999 !important;
 }
 
-.language-markdown .token.url {
-    color: #2e7d32 !important;
-    /* Green for urls */
-    text-decoration: underline;
+.token.namespace {
+    opacity: 0.7;
 }
 
-/* Shell/Bash styles */
-.language-bash,
-.language-shell {
-    background-color: #263238 !important;
-    color: #ffffff !important;
-    border-left: 4px solid #607d8b !important;
-    /* Gray-blue for shell */
-    padding-left: 1em !important;
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #905 !important;
 }
 
-.language-bash .token.function,
-.language-shell .token.function {
-    color: #ffca28 !important;
-    /* Yellow for functions */
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #690 !important;
 }
 
-.language-bash .token.string,
-.language-shell .token.string {
-    color: #8bc34a !important;
-    /* Light green for strings */
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+    color: #9a6e3a !important;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+    color: #07a !important;
+}
+
+.token.function,
+.token.class-name {
+    color: #dd4a68 !important;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+    color: #e90 !important;
+}
+
+.token.important,
+.token.bold {
+    font-weight: bold;
+}
+
+.token.italic {
+    font-style: italic;
+}
+
+/* No language-specific styles - using basic Prism styling for all languages */
+
+/* Language indicator styles */
+.language-indicator {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #666;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    pointer-events: none;
 }
 
 /* Generic fallback styles for any code block */
