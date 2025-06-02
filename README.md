@@ -16,6 +16,8 @@ A modern chat interface application built with React and TypeScript, featuring a
 - Web search capabilities
 - Vector-based document storage and retrieval
 
+> For comprehensive documentation of all features and functionality, please see the [Documentation Index](docs/README.md).
+
 ## System Architecture
 
 The system consists of multiple microservices:
