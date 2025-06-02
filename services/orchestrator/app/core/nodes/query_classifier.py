@@ -226,13 +226,19 @@ def query_type_classifier(state: Dict[str, Any]) -> Dict[str, Any]:
         file_gen_chain = file_gen_prompt | llm
         try:
             file_gen_response = file_gen_chain.invoke({"query": query_content})
-            file_gen_result = json.loads(file_gen_response.content)
-            file_identifier = file_gen_result.get("file_identifier")
-            logger.info(f"Generated file identifier for new query: {file_identifier}")
             
-            # Save this as the most recent identifier
-            if file_identifier:
-                _save_recent_identifier(file_identifier)
+            # Check if content is not empty before parsing
+            if file_gen_response.content and file_gen_response.content.strip():
+                file_gen_result = json.loads(file_gen_response.content)
+                file_identifier = file_gen_result.get("file_identifier")
+                logger.info(f"Generated file identifier for new query: {file_identifier}")
+                
+                # Save this as the most recent identifier
+                if file_identifier:
+                    _save_recent_identifier(file_identifier)
+            else:
+                logger.error("Empty content received from file_gen_chain")
+                file_identifier = None
         except Exception as e:
             logger.error(f"Error generating file identifier: {str(e)}")
             # Fallback to a generic identifier with timestamp

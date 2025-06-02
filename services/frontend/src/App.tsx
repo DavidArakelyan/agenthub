@@ -13,15 +13,7 @@ import 'prismjs/components/prism-c'; // Import C first as C++ depends on it
 import 'prismjs/components/prism-cpp'; // C++ depends on C
 import 'prismjs/components/prism-python'; // Add Python language support
 import 'prismjs/components/prism-java'; // Add Java language support
-
-// Add diagnostic logging
-console.log('Prism loaded:', !!Prism);
-console.log('Languages available:', Object.keys(Prism.languages));
-console.log('C language available:', !!Prism.languages.c);
-console.log('C++ language available:', !!Prism.languages.cpp);
-console.log('Python language available:', !!Prism.languages.python);
-console.log('Java language available:', !!Prism.languages.java);
-console.log('JavaScript language available:', !!Prism.languages.javascript);
+import 'prismjs/components/prism-markdown'; // Add Markdown language support
 
 // Markdown support
 import ReactMarkdown from 'react-markdown';
@@ -34,6 +26,18 @@ import 'prismjs/themes/prism-tomorrow.css';
 import './language-styles.css'; // Import additional language styling
 import './code-styling.css'; // Import code-specific styling improvements
 import './App.css';
+
+// Add diagnostic logging
+console.log('Prism loaded:', !!Prism);
+console.log('Languages available:', Object.keys(Prism.languages));
+console.log('Markdown language available:', !!Prism.languages.markdown);
+console.log('C language available:', !!Prism.languages.c);
+console.log('C++ language available:', !!Prism.languages.cpp);
+console.log('Python language available:', !!Prism.languages.python);
+console.log('Java language available:', !!Prism.languages.java);
+console.log('JavaScript language available:', !!Prism.languages.javascript);
+
+
 
 interface AttachedFile {
     file: File;
@@ -294,15 +298,24 @@ function App() {
         });
     }, [canvas]); // Only depends on canvas
 
-    const loadChatHistory = async (chatId: string) => {
+    const loadChatHistory = useCallback(async (chatId: string) => {
         try {
+            // Check connection first
+            const isConnected = await apiClient.checkConnection();
+            if (!isConnected) {
+                // Handle gracefully - maybe set a state to retry later
+                console.warn('Backend not available yet, will retry loading chat history later');
+                setTimeout(() => loadChatHistory(chatId), 2000); // Retry after 2 seconds
+                return;
+            }
+
             const history = await apiClient.getChatHistory(chatId);
             setMessages(history);
         } catch (error) {
             console.error('Error loading chat history:', error);
             setError('Failed to load chat history');
         }
-    };
+    }, []);  // Empty dependency array as setMessages and setError are stable
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

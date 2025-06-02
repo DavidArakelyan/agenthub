@@ -22,3 +22,8 @@ declare module 'prismjs/components/prism-java' {
     const language: any; // You can replace 'any' with Prism.Grammar
     export default language;
 }
+
+declare module 'prismjs/components/prism-markdown' {
+    const language: any; // You can replace 'any' with Prism.Grammar
+    export default language;
+}
