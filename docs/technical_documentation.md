@@ -160,6 +160,57 @@ Provides web search capabilities:
 - Lazy loading of chat history
 - Efficient syntax highlighting with debouncing
 - Connection resilience with automatic retries
+- Dynamic resizing handlers for UI components
+- Smooth transitions between different layout configurations
+
+## UI Design
+
+### Responsive Layout
+
+The interface uses a flexible layout system:
+- Dynamically adjustable main chat and canvas areas
+- Resizing handlers with mouse event tracking
+- Local storage of user preferences for panel dimensions
+- CSS transitions for smooth resizing experiences
+- Content-aware minimum dimensions to ensure usability
+
+#### Panel Resizing Implementation
+
+The application implements a sophisticated resize system using React hooks and DOM event listeners:
+
+```typescript
+// State management for resize operations
+const [isResizing, setIsResizing] = useState<boolean>(false);
+const [canvasWidth, setCanvasWidth] = useState<number>(() => {
+  const savedWidth = localStorage.getItem('canvasWidth');
+  return savedWidth ? parseInt(savedWidth, 10) : 500; // Default width
+});
+
+// Example of resize handler implementation
+const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    const containerWidth = window.innerWidth;
+    const distanceFromRight = containerWidth - e.clientX;
+    const maxWidth = Math.min(containerWidth * 0.5, 800);
+    const newWidth = Math.max(300, Math.min(maxWidth, distanceFromRight));
+    setCanvasWidth(newWidth);
+    
+    // Save user preference
+    localStorage.setItem('canvasWidth', newWidth.toString());
+}, [isResizing]);
+
+// Event listeners setup and cleanup
+useEffect(() => {
+    if (isResizing) {
+        document.addEventListener('mousemove', handleResizeMove);
+        document.addEventListener('mouseup', handleResizeEnd);
+    }
+    return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+    };
+}, [isResizing, handleResizeMove, handleResizeEnd]);
+```
 
 ## Browser Compatibility
 

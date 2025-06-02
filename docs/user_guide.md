@@ -95,6 +95,9 @@ The Canvas offers two saving options:
 
 - The canvas panel width is adjustable by dragging the left edge.
 - Your preferred width is remembered between sessions.
+- Resizing the canvas dynamically adjusts the main chat area to maintain an optimal layout.
+- This flexibility allows you to prioritize either conversation space or generated content based on your current needs.
+- The minimum width constraints ensure both panels remain usable regardless of adjustment.
 
 ## Content Updates and Versioning
 
@@ -178,7 +181,16 @@ AgentHub provides clear visual cues to enhance user experience.
 
 - The interface adapts to different screen sizes.
 - The canvas panel can be resized to accommodate different content types.
+- The main chat area and canvas dynamically resize in relation to each other, providing a flexible workspace.
 - Font sizes and spacing are optimized for readability.
+- Layout intelligently adjusts when the window is resized to maintain usability.
+
+#### Dynamic Resizing Features
+
+- **Interactive Divider**: The boundary between the chat and canvas areas can be dragged to adjust their relative sizes.
+- **Persistent Preferences**: Your customized layout proportions are saved and restored between sessions.
+- **Optimal Space Distribution**: When you resize one panel, the other automatically adjusts to maintain the overall layout integrity.
+- **Content-Aware Resizing**: The system intelligently redistributes space based on the type and amount of content displayed.
 
 ## Advanced Features
 

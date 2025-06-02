@@ -64,6 +64,26 @@ When the AI generates code or documents, they will appear in the Canvas panel on
 - Click the "×" button next to a chat in the sidebar to delete it
 - Confirm the deletion when prompted
 
+## Customizing Your Workspace
+
+### Adjusting Panel Sizes
+
+AgentHub offers a flexible workspace that you can customize:
+
+1. **Resize the Canvas Panel**:
+   - Hover over the left edge of the canvas panel until you see the resize cursor
+   - Click and drag to adjust the width of the canvas panel
+   - The main chat area will automatically resize in response
+
+2. **Optimizing Your View**:
+   - For code review: Expand the canvas panel to see more code
+   - For conversation focus: Shrink the canvas to prioritize the chat area
+   - Your panel size preferences are saved between sessions
+
+3. **Responsive Adaptation**:
+   - The interface will automatically adjust when you resize your browser window
+   - All components maintain usability at different screen sizes
+
 ## Updating Generated Content
 
 ### Requesting Updates

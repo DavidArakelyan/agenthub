@@ -57,10 +57,15 @@ AgentHub is an advanced AI assistant platform that combines sophisticated langua
 
 ### UI Enhancements
 
-- **Resizable Panels**: Adjustable canvas width
+- **Resizable Panels**: 
+  - Adjustable canvas and chat areas with dynamic layout adaptation
+  - Interactive divider that can be dragged to customize workspace proportions
+  - Persistent size preferences saved between sessions
+  - Content-aware resizing that maintains minimum usable dimensions
 - **Theme Consistency**: Dark mode for code areas
 - **Keyboard Shortcuts**: Enter to send, Shift+Enter for new line
 - **Drag and Drop**: File attachment via drag and drop
+- **Responsive Layout**: Interface elements that adjust to available space
 
 ### Contextual Features
 
