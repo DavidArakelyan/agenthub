@@ -14,7 +14,7 @@ export interface ChatMessage {
 }
 
 export interface GeneratedContent {
-    type: 'code' | 'document';
+    type: 'code' | 'document' | string;
     format: string;
     content: string;
 }
@@ -25,6 +25,7 @@ export interface Chat {
     messages: ChatMessage[];
     createdAt: string;
     updatedAt: string;
+    canvas?: GeneratedContent[]; // Add canvas property to store generated content
 }
 
 export interface ChatResponse {

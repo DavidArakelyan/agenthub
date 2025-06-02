@@ -50,6 +50,7 @@ interface Chat {
     messages: ChatMessage[];
     createdAt: Date;
     updatedAt: Date;
+    canvas?: GeneratedContent[]; // Add canvas content to store with each chat
 }
 
 interface GeneratedContent {
@@ -271,8 +272,15 @@ function App() {
             }));
             setChats(parsedChats);
             if (parsedChats.length > 0) {
-                setCurrentChatId(parsedChats[0].id);
-                loadChatHistory(parsedChats[0].id);
+                const firstChat = parsedChats[0];
+                setCurrentChatId(firstChat.id);
+                loadChatHistory(firstChat.id);
+
+                // Also restore canvas content if available
+                if (firstChat.canvas && firstChat.canvas.length > 0) {
+                    console.log(`Restoring ${firstChat.canvas.length} canvas items for initial chat ${firstChat.id}`);
+                    setCanvas(firstChat.canvas);
+                }
             }
         }
     }, []);
@@ -354,7 +362,8 @@ function App() {
                 name: 'New Chat',
                 messages: [],
                 createdAt: new Date(),
-                updatedAt: new Date()
+                updatedAt: new Date(),
+                canvas: [] // Initialize with empty canvas array
             };
             setChats(prev => [newChat, ...prev]);
             setCurrentChatId(chatId);
@@ -382,7 +391,15 @@ function App() {
             if (chat) {
                 setCurrentChatId(chatId);
                 await loadChatHistory(chatId);
-                setCanvas([]); // Reset canvas when switching chats
+
+                // Restore canvas content if available, otherwise clear it
+                if (chat.canvas && chat.canvas.length > 0) {
+                    console.log(`Restoring ${chat.canvas.length} canvas items for chat ${chat.id}`);
+                    setCanvas(chat.canvas);
+                } else {
+                    setCanvas([]);
+                }
+
                 setAttachedFiles([]);
             }
         } catch (error) {
@@ -486,15 +503,28 @@ function App() {
                 }
                 // The useEffect hook observing 'canvas' will handle the highlighting.
                 // No direct call to triggerSyntaxHighlighting() here anymore.
-                setCanvas(prevCanvas => [...prevCanvas, normalizedContent]);
-            }
+                const updatedCanvas = [...canvas, normalizedContent];
+                setCanvas(updatedCanvas);
 
-            // Update chat in state
-            setChats(prev => prev.map(chat =>
-                chat.id === currentChatId
-                    ? { ...chat, messages: finalMessages, updatedAt: new Date() }
-                    : chat
-            ));
+                // Also save the canvas content with the updated chat
+                setChats(prev => prev.map(chat =>
+                    chat.id === currentChatId
+                        ? {
+                            ...chat,
+                            messages: finalMessages,
+                            updatedAt: new Date(),
+                            canvas: updatedCanvas // Save canvas with the chat
+                        }
+                        : chat
+                ));
+            } else {
+                // Update chat in state without canvas changes
+                setChats(prev => prev.map(chat =>
+                    chat.id === currentChatId
+                        ? { ...chat, messages: finalMessages, updatedAt: new Date() }
+                        : chat
+                ));
+            }
 
             setInput('');
             setAttachedFiles([]);
