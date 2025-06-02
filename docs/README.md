@@ -6,6 +6,7 @@ Welcome to the AgentHub documentation. This comprehensive set of documents will 
 
 ### User Documentation
 
+- [Quick Start Guide](quick_start_guide.md) - Get up and running in minutes
 - [Features Overview](features_overview.md) - A high-level overview of AgentHub capabilities
 - [Getting Started](getting_started.md) - Quick start guide for new users
 - [User Guide](user_guide.md) - Comprehensive documentation of all user features
@@ -14,6 +15,8 @@ Welcome to the AgentHub documentation. This comprehensive set of documents will 
 
 - [Technical Documentation](technical_documentation.md) - Detailed system architecture and implementation details
 - [API Reference](../services/frontend/API.md) - API endpoints and usage
+- [Deployment Guide](deployment_guide.md) - Comprehensive guide for setting up and deploying AgentHub
+- [Docker Quick Guide](docker-quickguide.md) - Common Docker commands and best practices
 
 ## About AgentHub
 

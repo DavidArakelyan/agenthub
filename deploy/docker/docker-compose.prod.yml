@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: ../../services/orchestrator
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../.env.prod
+    environment:
+      - ENVIRONMENT=production
+    volumes:
+      - orchestrator_data:/app/data
+    depends_on:
+      - redis
+      - rabbitmq
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: always
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  milvus:
+    image: milvusdb/milvus:v2.3.1
+    restart: always
+    volumes:
+      - milvus_data:/var/lib/milvus
+    environment:
+      - ETCD_CFG.auto-compaction-mode=revision
+      - ETCD_CFG.auto-compaction-retention=1000
+      - COMMON_CFG.retention_duration=100
+
+  documents:
+    build:
+      context: ../../services/documents
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - ../../.env.prod
+    volumes:
+      - documents_data:/app/data
+
+  websearch:
+    build:
+      context: ../../services/websearch
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - ../../.env.prod
+
+  frontend:
+    build:
+      context: ../../services/frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "80:3000"
+    environment:
+      - REACT_APP_API_BASE_URL=/api
+      - REACT_APP_WS_URL=/api/ws
+      - REACT_APP_DOCUMENT_SERVICE_URL=/document
+      - REACT_APP_WEBSEARCH_SERVICE_URL=/websearch
+      - REACT_APP_MAX_FILE_SIZE=10485760
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - orchestrator
+      - documents
+      - websearch
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ../../deploy/prometheus:/etc/prometheus
+      - prometheus-storage:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+  milvus_data:
+  orchestrator_data:
+  documents_data:
+  prometheus-storage:
+  grafana-storage:

@@ -84,7 +84,54 @@ The system consists of multiple microservices:
 - Docker and Docker Compose
 - OpenAI API key
 
-### Installation
+### Quick Setup (5 minutes)
+
+If you just want to get the application up and running as quickly as possible:
+
+#### One-Line Installation
+
+```bash
+curl -s https://raw.githubusercontent.com/yourusername/agenthub/main/quickstart.sh | bash -s -- your_openai_api_key
+```
+
+This command automatically clones the repo, sets up the environment, and starts the application.
+
+#### Using Makefile (After Cloning)
+
+If you've already cloned the repository, the fastest way to get started is:
+
+```bash
+# Navigate to the project directory
+cd agenthub
+
+# Check system readiness (recommended)
+./check_system.sh
+
+# Setup and start with one command (will prompt for API key if not in env)
+make quick-start
+
+# Or provide API key directly
+OPENAI_API_KEY=your_openai_api_key make quick-start
+```
+
+#### Manual Quick Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/agenthub.git
+cd agenthub
+
+# Set your OpenAI API key (replace with your actual key)
+export OPENAI_API_KEY=your_openai_api_key_here
+
+# Run the setup script and start the application
+./setup.sh quick $OPENAI_API_KEY && make start-local
+
+# Open the application in your browser
+open http://localhost:3000
+```
+
+### Standard Installation
 
 1. Clone the repository:
 ```bash
@@ -92,16 +139,17 @@ git clone https://github.com/yourusername/agenthub.git
 cd agenthub
 ```
 
-2. Create a `.env` file in the root directory with the following variables:
-```env
-OPENAI_API_KEY=your_api_key_here
-ENVIRONMENT=development
+2. Use the setup script for an automated setup:
+```bash
+./setup.sh
 ```
 
 3. Start the development environment:
 ```bash
-docker-compose -f deploy/docker/docker-compose.dev.yml up
+make start-local
 ```
+
+For detailed deployment instructions, see [Deployment Guide](docs/deployment_guide.md).
 
 The services will be available at:
 - Frontend: http://localhost:3000
