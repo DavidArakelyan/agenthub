@@ -1,4 +1,4 @@
-After thoroughly reviewing the codebase and architecture documentation, here's an overview of the implementation status of features listed in the README:
+This is the overview of the implementation status of features listed in the README:
 
 ## Features Implementation Status Summary
 
