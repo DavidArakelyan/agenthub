@@ -2,6 +2,8 @@
 
 A modern chat interface application built with React and TypeScript, featuring a ChatGPT-like experience with file attachments and chat history management. The system uses a microservices architecture with LLM-based agents for intelligent task processing.
 
+![AgentHub Interface](services/frontend/public/screenshot.png)
+
 ## Features
 
 - Modern chat interface with ChatGPT-like design
