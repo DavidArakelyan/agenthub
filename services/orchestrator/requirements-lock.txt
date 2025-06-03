@@ -8,10 +8,12 @@ certifi==2025.4.26
 charset-normalizer==3.4.2
 click==8.1.8
 dataclasses-json==0.6.7
+debugpy==1.8.14
 distro==1.9.0
+dotenv==0.9.9
 exceptiongroup==1.3.0
 fastapi==0.115.12
-fastmcp==2.3.4
+fastmcp==2.2.0
 frozenlist==1.6.0
 graphviz==0.20.3
 h11==0.16.0
@@ -42,6 +44,7 @@ mypy_extensions==1.1.0
 numpy==2.2.5
 openai==1.78.1
 openapi-pydantic==0.5.1
+-e git+https://github.com/DavidArakelyan/agenthub.git@724bc6d2400df9bb3b55001c8c8af244f5e1e844#egg=orchestrator&subdirectory=services/orchestrator
 orjson==3.10.18
 ormsgpack==1.9.1
 packaging==24.2
@@ -54,7 +57,7 @@ pydantic_core==2.33.2
 Pygments==2.19.1
 pytest==8.3.5
 pytest-asyncio==0.26.0
-python-dotenv==1.1.0
+python-dotenv==1.0.0
 python-json-logger==3.3.0
 python-multipart==0.0.20
 PyYAML==6.0.2
@@ -67,6 +70,7 @@ sniffio==1.3.1
 SQLAlchemy==2.0.41
 sse-starlette==2.3.5
 starlette==0.46.2
+tabulate==0.9.0
 tenacity==9.1.2
 tiktoken==0.9.0
 tqdm==4.67.1
