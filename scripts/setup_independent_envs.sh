@@ -29,8 +29,6 @@ for service in "${services[@]}"; do
     log "Creating new virtual environment .venv_${service} for $service..."
     python -m venv ".venv_${service}"
   fi
-  log "Creating new virtual environment for $service..."
-  python -m venv ".venv_${service}"
   
   # Activate and install dependencies
   source ".venv_${service}/bin/activate"

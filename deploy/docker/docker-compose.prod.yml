@@ -17,18 +17,27 @@ services:
     depends_on:
       - redis
       - rabbitmq
+    profiles:
+      - all
+      - api
 
   redis:
     image: redis:7-alpine
     restart: always
     volumes:
       - redis_data:/data
+    profiles:
+      - all
+      - support
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     restart: always
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    profiles:
+      - all
+      - support
 
   milvus:
     image: milvusdb/milvus:v2.3.1
@@ -39,6 +48,9 @@ services:
       - ETCD_CFG.auto-compaction-mode=revision
       - ETCD_CFG.auto-compaction-retention=1000
       - COMMON_CFG.retention_duration=100
+    profiles:
+      - all
+      - support
 
   documents:
     build:
@@ -49,6 +61,9 @@ services:
       - ../../.env.prod
     volumes:
       - documents_data:/app/data
+    profiles:
+      - all
+      - api
 
   websearch:
     build:
@@ -57,6 +72,9 @@ services:
     restart: always
     env_file:
       - ../../.env.prod
+    profiles:
+      - all
+      - api
 
   frontend:
     build:
@@ -71,6 +89,9 @@ services:
       - REACT_APP_DOCUMENT_SERVICE_URL=/document
       - REACT_APP_WEBSEARCH_SERVICE_URL=/websearch
       - REACT_APP_MAX_FILE_SIZE=10485760
+    profiles:
+      - all
+      - web
 
   nginx:
     image: nginx:alpine
@@ -85,6 +106,9 @@ services:
       - orchestrator
       - documents
       - websearch
+    profiles:
+      - all
+      - web
 
   prometheus:
     image: prom/prometheus:latest
@@ -92,6 +116,9 @@ services:
     volumes:
       - ../../deploy/prometheus:/etc/prometheus
       - prometheus-storage:/prometheus
+    profiles:
+      - all
+      - support
 
   grafana:
     image: grafana/grafana:latest
@@ -99,6 +126,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+    profiles:
+      - all
+      - support
     volumes:
       - grafana-storage:/var/lib/grafana
 

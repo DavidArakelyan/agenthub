@@ -1,0 +1,27 @@
+# Use Python 3.9 slim image
+FROM python:3.9-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements-lock.txt first to leverage Docker cache
+COPY requirements-lock.txt .
+
+# Install dependencies from locked requirements
+RUN pip install --no-cache-dir -r requirements-lock.txt
+
+# For development, install any additional development packages
+RUN pip install --no-cache-dir pytest pytest-cov
+
+# Copy application code (in development this is usually mounted as a volume)
+COPY . .
+
+# Expose port
+EXPOSE 8002
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Run the application with reload for development
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"]

@@ -1,0 +1,23 @@
+# Use Node 16 alpine image for smaller size
+FROM node:16-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files for dependency installation
+COPY package.json package-lock.json ./
+
+# Install dependencies using the package-lock.json for consistent builds
+RUN npm ci
+
+# Copy application code (in development this is usually mounted as a volume)
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables for development
+ENV NODE_ENV=development
+
+# Start the application in development mode
+CMD ["npm", "start"]
