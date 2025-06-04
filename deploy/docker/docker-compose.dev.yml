@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   orchestrator:
     build:
@@ -28,6 +26,7 @@ services:
       - redis_data:/data
     profiles:
       - all
+      - api
       - support
 
   rabbitmq:
@@ -39,6 +38,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     profiles:
       - all
+      - api
       - support
 
   milvus:
@@ -78,6 +78,27 @@ services:
     profiles:
       - all
       - support
+
+  documents:
+    build:
+      context: ../../services/documents
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../../services/documents:/app
+    env_file:
+      - ../../.env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ENVIRONMENT=development
+    depends_on:
+      - redis
+      - rabbitmq
+      - milvus
+    profiles:
+      - all
+      - api
 
   websearch:
     build:

@@ -72,14 +72,36 @@ logger.setLevel(logging.INFO)
 
 
 def load_environment() -> None:
-    """Load environment variables from workspace root."""
-    workspace_env = Path(__file__).resolve().parents[4] / ".env"
-    logger.debug(f"Looking for .env at: {workspace_env}")
-    if workspace_env.exists():
-        logger.info(f"Loading environment from {workspace_env}")
-        load_dotenv(dotenv_path=workspace_env, verbose=True, override=True)
-    else:
-        logger.warning(f"No .env file found at {workspace_env}")
+    """Load environment variables, prioritizing existing environment variables."""
+    # First check if OPENAI_API_KEY is already set in the environment
+    if os.environ.get("OPENAI_API_KEY"):
+        logger.info("OPENAI_API_KEY already set in environment")
+        return
+    
+    # If not set, try to load from .env file
+    try:
+        workspace_env = Path(__file__).resolve().parents[4] / ".env"
+        logger.debug(f"Looking for .env at: {workspace_env}")
+        if workspace_env.exists():
+            logger.info(f"Loading environment from {workspace_env}")
+            load_dotenv(dotenv_path=workspace_env, verbose=True, override=True)
+        else:
+            # Try alternative locations as fallback
+            app_env = Path(__file__).resolve().parents[2] / ".env"
+            if app_env.exists():
+                logger.info(f"Loading environment from {app_env}")
+                load_dotenv(dotenv_path=app_env, verbose=True, override=True)
+            else:
+                logger.warning("No .env file found")
+    except IndexError:
+        logger.warning("Error navigating directory structure, trying alternative paths")
+        # Try current directory as last resort
+        current_env = Path(".env")
+        if current_env.exists():
+            logger.info(f"Loading environment from current directory: {current_env}")
+            load_dotenv(dotenv_path=current_env, verbose=True, override=True)
+        else:
+            logger.warning("No .env file found in any location")
 
 
 # Load environment variables from root .env file
@@ -93,7 +115,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Agent Orchestrator"
 
-    # OpenAI Configuration - will be loaded from environment
+    # OpenAI Configuration - will be loaded from environments
     openai_api_key: str = os.environ.get("OPENAI_API_KEY")
 
     def __init__(self, **kwargs):

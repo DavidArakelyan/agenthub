@@ -9,6 +9,31 @@ log() {
   echo "$(date +'%Y-%m-%d %H:%M:%S') - $1"
 }
 
+# Use PYTHON_CMD and PIP_CMD from environment if set, otherwise use defaults
+if [ -z "$PYTHON_CMD" ]; then
+  # Not set by parent script, try to detect
+  if command -v python3 &>/dev/null; then
+    PYTHON_CMD="python3"
+  else
+    PYTHON_CMD="python"
+  fi
+  log "Using auto-detected Python command: $PYTHON_CMD"
+else
+  log "Using Python command from environment: $PYTHON_CMD"
+fi
+
+if [ -z "$PIP_CMD" ]; then
+  # Not set by parent script, try to detect
+  if command -v pip3 &>/dev/null; then
+    PIP_CMD="pip3"
+  else
+    PIP_CMD="pip"
+  fi
+  log "Using auto-detected pip command: $PIP_CMD"
+else
+  log "Using pip command from environment: $PIP_CMD"
+fi
+
 # Array of service directories
 services=("orchestrator" "documents" "websearch")
 
@@ -27,7 +52,11 @@ for service in "${services[@]}"; do
   else
     # Create service-specific virtual environment
     log "Creating new virtual environment .venv_${service} for $service..."
-    python -m venv ".venv_${service}"
+    $PYTHON_CMD -m venv ".venv_${service}" || {
+      log "Error: Failed to create virtual environment. Make sure you have the venv module installed."
+      log "Try installing it with: sudo apt-get install python3-venv (on Ubuntu/Debian)"
+      exit 1
+    }
   fi
   
   # Activate and install dependencies
@@ -35,21 +64,30 @@ for service in "${services[@]}"; do
   
   # Upgrade pip and install development tools
   log "Upgrading pip and installing dependencies for $service..."
-  pip install --upgrade pip
+  $PIP_CMD install --upgrade pip
   
   # Install from locked requirements if available, otherwise from requirements.txt
   if [ -f "requirements-lock.txt" ]; then
     log "Installing from locked requirements for $service..."
-    pip install -r requirements-lock.txt
+    $PIP_CMD install -r requirements-lock.txt || {
+      log "Error: Failed to install from requirements-lock.txt"
+      exit 1
+    }
   else
     log "Installing from requirements.txt for $service..."
-    pip install -r requirements.txt
+    $PIP_CMD install -r requirements.txt || {
+      log "Error: Failed to install from requirements.txt"
+      exit 1
+    }
   fi
   
   # Install the package in development mode if setup.py exists
   if [ -f "setup.py" ]; then
     log "Installing package in development mode for $service..."
-    pip install -e .
+    $PIP_CMD install -e . || {
+      log "Error: Failed to install package in development mode"
+      exit 1
+    }
   fi
   
   # Create activation helper script for this service

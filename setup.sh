@@ -52,17 +52,31 @@ check_prerequisites() {
     fi
     
     # Check Python (required for virtual environments)
-    if ! command_exists python; then
+    if ! command_exists python && ! command_exists python3; then
         print_error "Python is not installed. Python is required for setting up virtual environments."
         exit 1
     fi
     
-    # Check pip-tools for requirements-lock.txt generation
-    if ! command_exists pip-compile; then
-        print_message "pip-tools is not installed. Installing..."
-        pip install pip-tools
-        print_success "pip-tools installed successfully."
+    # Set Python command variable
+    if command_exists python3; then
+        PYTHON_CMD="python3"
+    else
+        PYTHON_CMD="python"
     fi
+    export PYTHON_CMD
+    
+    # Check pip and set pip command variable
+    if command_exists pip; then
+        PIP_CMD="pip"
+    elif command_exists pip3; then
+        PIP_CMD="pip3"
+    else
+        print_error "pip is not installed. pip is required for installing dependencies."
+        print_message "Please install pip first. You can install pip by following instructions at:"
+        print_message "https://pip.pypa.io/en/stable/installation/"
+        exit 1
+    fi
+    export PIP_CMD
     
     print_success "All essential prerequisites are installed."
 }
@@ -107,6 +121,20 @@ initialize_api_key() {
 generate_lock_files() {
     print_message "Checking for requirements-lock.txt files..."
     
+    # Check if pip is available
+    if [ -z "$PIP_CMD" ]; then
+        if command_exists pip; then
+            PIP_CMD="pip"
+        elif command_exists pip3; then
+            PIP_CMD="pip3"
+        else
+            print_error "pip is not installed. Cannot generate lock files."
+            print_message "Please install pip first to continue."
+            exit 1
+        fi
+        export PIP_CMD
+    fi
+    
     # Array of service directories with Python requirements
     services=("orchestrator" "documents" "websearch")
     
@@ -114,7 +142,60 @@ generate_lock_files() {
         if [ -f "services/$service/requirements.txt" ]; then
             if [ ! -f "services/$service/requirements-lock.txt" ] || [ "services/$service/requirements.txt" -nt "services/$service/requirements-lock.txt" ]; then
                 print_message "Generating requirements-lock.txt for $service service..."
-                (cd "services/$service" && pip-compile requirements.txt -o requirements-lock.txt)
+                
+                # Create a temporary virtual environment for generating requirements-lock.txt
+                temp_venv_dir=$(mktemp -d)
+                print_message "Creating temporary virtual environment at $temp_venv_dir..."
+                
+                # Create virtual environment
+                $PYTHON_CMD -m venv "$temp_venv_dir" || {
+                    print_error "Failed to create temporary virtual environment."
+                    rm -rf "$temp_venv_dir"
+                    exit 1
+                }
+                
+                # Activate virtual environment and install requirements
+                (
+                    source "$temp_venv_dir/bin/activate"
+                    cd "services/$service"
+                    
+                    # Install dependencies from requirements.txt
+                    $PIP_CMD install --upgrade pip
+                    $PIP_CMD install -r requirements.txt || {
+                        print_error "Failed to install requirements for $service service."
+                        deactivate
+                        rm -rf "$temp_venv_dir"
+                        exit 1
+                    }
+                    
+                    # Install the package in development mode if setup.py exists
+                    if [ -f "setup.py" ]; then
+                        $PIP_CMD install -e . || {
+                            print_error "Failed to install package in development mode for $service service."
+                            deactivate
+                            rm -rf "$temp_venv_dir"
+                            exit 1
+                        }
+                    fi
+                    
+                    # Generate requirements-lock.txt using pip freeze
+                    $PIP_CMD freeze > requirements-lock.txt || {
+                        print_error "Failed to generate requirements-lock.txt for $service service."
+                        deactivate
+                        rm -rf "$temp_venv_dir"
+                        exit 1
+                    }
+                    
+                    deactivate
+                ) || {
+                    print_error "An error occurred while generating requirements-lock.txt for $service service."
+                    rm -rf "$temp_venv_dir"
+                    exit 1
+                }
+                
+                # Clean up temporary virtual environment
+                rm -rf "$temp_venv_dir"
+                
                 print_success "Generated requirements-lock.txt for $service service."
             else
                 print_message "requirements-lock.txt for $service service is up to date."
@@ -142,21 +223,17 @@ setup_dev() {
     print_message "Setting up independent virtual environments for each service..."
     if [ -f scripts/setup_independent_envs.sh ]; then
         chmod +x scripts/setup_independent_envs.sh
+        
+        # Make sure PYTHON_CMD and PIP_CMD are exported for the script
+        export PYTHON_CMD
+        export PIP_CMD
+        
         # Run the script to create environments
         ./scripts/setup_independent_envs.sh
         print_success "Virtual environments created successfully."
     else
         print_error "setup_independent_envs.sh script not found!"
         exit 1
-    fi
-    
-    # Install global dependencies (if needed)
-    if command_exists python3; then
-        print_message "Installing global Python dependencies..."
-        python3 -m pip install --upgrade pip
-        if [ -f requirements-dev.txt ]; then
-            python3 -m pip install -r requirements-dev.txt
-        fi
     fi
     
     # Pull Docker images for all services
@@ -191,7 +268,7 @@ else
 fi
 
 # Start the services with the specified profile
-docker-compose -f deploy/docker/docker-compose.dev.yml --profile "$PROFILE" up -d
+docker-compose -f deploy/docker/docker-compose.dev.yml --profile "$PROFILE" --env-file .env up -d
 
 echo -e "${GREEN}[AgentHub]${NC} Development environment started!"
 echo -e "${BLUE}[AgentHub]${NC} Access the application at http://localhost:3000"
@@ -345,7 +422,7 @@ main() {
     fi
     
     # Check if python is required for virtual environments
-    if ! command_exists python; then
+    if ! command_exists python && ! command_exists python3; then
         print_error "Python is not installed. Python is required for setting up virtual environments."
         exit 1
     fi
@@ -362,6 +439,12 @@ main() {
         
         if [ -f scripts/setup_independent_envs.sh ]; then
             chmod +x scripts/setup_independent_envs.sh
+            
+            # Make sure PYTHON_CMD and PIP_CMD are exported for the script
+            export PYTHON_CMD
+            export PIP_CMD
+            
+            # Run the script to create environments
             ./scripts/setup_independent_envs.sh
         else
             print_error "setup_independent_envs.sh script not found!"
@@ -396,7 +479,7 @@ else
 fi
 
 # Start the services with the specified profile
-docker-compose -f deploy/docker/docker-compose.dev.yml --profile "$PROFILE" up -d
+docker-compose -f deploy/docker/docker-compose.dev.yml --profile "$PROFILE" --env-file .env up -d
 
 echo -e "${GREEN}[AgentHub]${NC} Development environment started!"
 echo -e "${BLUE}[AgentHub]${NC} Access the application at http://localhost:3000"
