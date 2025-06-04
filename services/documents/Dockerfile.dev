@@ -1,5 +1,5 @@
-# Use Python 3.9 slim image
-FROM python:3.9-slim
+# Use Python 3.10 slim image
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -9,6 +9,7 @@ COPY requirements-lock.txt .
 
 # Install dependencies from locked requirements
 RUN pip install --no-cache-dir -r requirements-lock.txt
+RUN pip install --no-cache-dir sentence-transformers==2.2.2 huggingface-hub==0.16.4
 
 # For development, install any additional development packages
 RUN pip install --no-cache-dir pytest pytest-cov
